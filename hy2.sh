@@ -10,8 +10,7 @@ GENPASS="$(generate_random_password)"
 
 echo_hysteria_config_yaml() {
   cat << EOF
-listen: :33810
-
+listen: :${port:-33810}
 
 #有域名，使用CA证书
 #acme:
@@ -80,7 +79,7 @@ service hysteria start
 
 echo "------------------------------------------------------------------------"
 echo "hysteria2已经安装完成"
-echo "默认端口： 33810 ， 密码为： $GENPASS ，工具中配置：tls，SNI为： bing.com"
+echo "默认端口： ${port:-33810}" ， 密码为： $GENPASS ，工具中配置：tls，SNI为： bing.com"
 echo "配置文件：/etc/hysteria/config.yaml"
 echo "已经随系统自动启动"
 echo "看状态 service hysteria status"
