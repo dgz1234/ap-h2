@@ -36,11 +36,13 @@ bash <(curl...)
 ```
 
 # 带参数部署
+```bash
 bash <(curl...) --port 443 --password "Your$tr0ngP@ss"
-
+```
 # 专业语法
 bash <(curl...) install --port 3017
 
 # 卸载指令
 bash <(curl...) uninstall
+
 
