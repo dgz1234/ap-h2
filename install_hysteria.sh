@@ -176,7 +176,7 @@ main() {
   # 阶段2：下载安装
   local HYSTERIA_VERSION="${HYSTERIA_VERSION:-v2.6.2}"
   download_with_retry \
-    "https://github.com/apernet/hysteria/releases/download/${HYSTERIA_VERSION}/hysteria-linux-amd64" \
+    "https://github.com/apernet/hysteria/releases/download/app/${HYSTERIA_VERSION}/hysteria-linux-amd64" \
     /usr/local/bin/hysteria
   chmod +x /usr/local/bin/hysteria
 
