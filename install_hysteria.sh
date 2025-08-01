@@ -9,7 +9,6 @@ DEFAULT_PORT=2516
 # 函数定义 (兼容Alpine/BusyBox)
 #######################################
 
-# 显示帮助信息
 show_help() {
   cat <<EOF
 Usage: $0 [OPTIONS]
@@ -25,13 +24,10 @@ EOF
   exit 0
 }
 
-# 创建系统用户和组
 create_service_user() {
-  # 清理可能存在的旧配置
   deluser hysteria 2>/dev/null || true
   delgroup hysteria 2>/dev/null || true
 
-  # 创建组
   if ! grep -q "^hysteria:" /etc/group; then
     addgroup -S hysteria || {
       echo "❌ 无法创建hysteria组" >&2
@@ -39,20 +35,17 @@ create_service_user() {
     }
   fi
 
-  # 创建用户
   adduser -S -D -H -G hysteria hysteria || {
     echo "❌ 无法创建hysteria用户" >&2
     return 1
   }
 
-  # 验证
   if ! id hysteria &>/dev/null; then
     echo "⚠️ 警告：将使用root用户运行服务（非推荐）" >&2
     return 1
   fi
 }
 
-# 安装系统依赖
 install_dependencies() {
   for pkg in wget openssl; do
     if ! command -v "$pkg" &>/dev/null; then
@@ -65,17 +58,21 @@ install_dependencies() {
   done
 }
 
-# 生成随机密码
 generate_password() {
   openssl rand -base64 18 | tr -d '\n'
 }
 
-# 生成配置文件
+# 修改点1：增强日志配置
 generate_config() {
   local port="$1"
   local password="$2"
   cat <<EOF
 listen: :${port}
+log:
+  level: debug       # 改为debug级别确保输出所有日志
+  format: text       # 文本格式更易读
+  output: /var/log/hysteria/hysteria.log  # 使用专用日志目录
+  flush_interval: 1s # 强制每秒刷新日志
 tls:
   cert: /etc/hysteria/server.crt
   key: /etc/hysteria/server.key
@@ -90,7 +87,6 @@ masquerade:
 EOF
 }
 
-# 生成自签名证书
 generate_cert() {
   openssl ecparam -genkey -name prime256v1 -out /etc/hysteria/server.key
   openssl req -new -x509 -days 3650 -key /etc/hysteria/server.key \
@@ -99,7 +95,7 @@ generate_cert() {
   chmod 600 /etc/hysteria/server.key
 }
 
-# 创建OpenRC服务
+# 修改点2：更新服务文件中的日志路径
 create_service() {
   cat > /etc/init.d/hysteria <<'EOF'
 #!/sbin/openrc-run
@@ -111,7 +107,7 @@ command_background="yes"
 
 start_pre() {
     checkpath -d -m 755 -o hysteria /var/log/hysteria
-    checkpath -f -m 640 -o hysteria /var/log/hysteria.log
+    checkpath -f -m 640 -o hysteria /var/log/hysteria/hysteria.log  # 修正日志路径
 }
 
 depend() {
@@ -127,32 +123,18 @@ EOF
 #######################################
 
 main() {
-  # 参数解析
   local port="$DEFAULT_PORT"
   local password="$(generate_password)"
   
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --port)
-        port="$2"
-        shift 2
-        ;;
-      --password)
-        password="$2"
-        shift 2
-        ;;
-      --help)
-        show_help
-        ;;
-      *)
-        echo "❌ 未知选项: $1" >&2
-        show_help
-        exit 1
-        ;;
+      --port) port="$2"; shift 2 ;;
+      --password) password="$2"; shift 2 ;;
+      --help) show_help ;;
+      *) echo "❌ 未知选项: $1" >&2; show_help; exit 1 ;;
     esac
   done
 
-  # 安装流程
   echo "=== 正在安装Hysteria ==="
   install_dependencies
   create_service_user || HYSTERIA_USER="root"
@@ -170,6 +152,14 @@ main() {
   generate_config "$port" "$password" > /etc/hysteria/config.yaml
   generate_cert
 
+  # 修改点3：初始化日志系统
+  echo "→ 初始化日志系统..."
+  mkdir -p /var/log/hysteria
+  touch /var/log/hysteria/hysteria.log
+  chown -R "${HYSTERIA_USER:-hysteria}:hysteria" /var/log/hysteria
+  chmod 750 /var/log/hysteria
+  chmod 640 /var/log/hysteria/hysteria.log
+
   echo "→ 设置文件权限..."
   chown -R "${HYSTERIA_USER:-hysteria}:hysteria" /etc/hysteria
   chmod 640 /etc/hysteria/config.yaml
@@ -178,7 +168,6 @@ main() {
   create_service
   rc-update add hysteria
 
-  # 启动服务
   echo "→ 启动服务..."
   if ! /etc/init.d/hysteria start; then
     echo "❌ 服务启动失败" >&2
@@ -186,20 +175,26 @@ main() {
     exit 1
   fi
 
-  # 输出结果
+  # 修改点4：添加日志验证提示
   cat <<EOF
 
 ✅ 安装成功！
 ▸ 监听端口: ${port}
 ▸ 认证密码: ${password}
 ▸ 配置文件: /etc/hysteria/config.yaml
+▸ 日志文件: /var/log/hysteria/hysteria.log
 
 管理命令:
 启动: rc-service hysteria start
 停止: rc-service hysteria stop
 状态: rc-service hysteria status
-日志: tail -f /var/log/hysteria.log
+日志跟踪: tail -f /var/log/hysteria/hysteria.log
+
+等待10秒后自动显示日志头...
 EOF
+  sleep 10
+  echo "=== 日志文件开头 ==="
+  head -n 20 /var/log/hysteria/hysteria.log || echo "⚠️ 暂无日志输出，请尝试访问服务生成日志"
 }
 
 main "$@"
