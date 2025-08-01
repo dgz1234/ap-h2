@@ -1,12 +1,12 @@
-Hysteria 部署方案
+# 🚀 Hysteria 部署方案
 
-🌟 核心特性
+## 🌟 核心特性
 双模式部署架构
 极速命令行模式	bash <(curl...)	批量部署/CI集成	全自动非交互
 
 智能交互模式	bash <(curl...1.sh)	首次配置/调试	可视化引导
 
-🚀 极速命令行模式
+## 🚀 极速命令行模式
 
 快速查看帮助
 ```
@@ -43,7 +43,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/refs/heads/mai
 ```
 
 
-🖥 智能交互模式
+## 🖥 智能交互模式
 
 使用演示
 
@@ -98,7 +98,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/refs/heads/mai
 ```
 这个版本通过交互式菜单实现专业化的安装/卸载管理，同时保持传统脚本的简洁性，所有操作无需记忆参数，适合各种技术水平的用户使用
 
-安装命令
+## 🔧 安装命令
 
 ```
 bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/refs/heads/main/install_hysteria1.sh)
