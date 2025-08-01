@@ -32,7 +32,8 @@
 
 ```bash
 # 基础部署（默认配置）
-bash <(curl...) 
+bash <(curl...)
+```
 
 # 带参数部署
 bash <(curl...) --port 443 --password "Your$tr0ngP@ss"
@@ -42,3 +43,4 @@ bash <(curl...) install --port 3017
 
 # 卸载指令
 bash <(curl...) uninstall
+
