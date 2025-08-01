@@ -1,114 +1,114 @@
 #!/bin/bash
 set -euo pipefail
 
-# 全局配置
+# 版本配置
 HYSTERIA_VERSION="v2.6.2"
 DEFAULT_PORT=2516
-INSTALL_DIR="/usr/local/bin"
-CONFIG_DIR="/etc/hysteria"
 
 # 颜色定义
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-BOLD='\033[1m'
-NC='\033[0m'
+NC='\033[0m' # No Color
 
 #######################################
-# 专业化输出函数
+# 美化输出函数
 #######################################
 
-header() {
-  clear
-  echo -e "${BOLD}${BLUE}=== Hysteria 一键管理脚本 ===${NC}"
-  echo -e "${BLUE}▪ 版本: ${YELLOW}${HYSTERIA_VERSION}"
-  echo -e "${BLUE}▪ 系统: ${YELLOW}$(grep PRETTY_NAME /etc/os-release | cut -d= -f2)${NC}"
-  separator
-}
-
-separator() {
-  echo -e "${BLUE}──────────────────────────────${NC}"
-}
-
+info() { echo -e "${BLUE}[ℹ] ${1}${NC}"; }
 success() { echo -e "${GREEN}[✓] ${1}${NC}"; }
-error() { echo -e "${RED}[✗] ${1}${NC}"; exit 1; }
-warning() { echo -e "${YELLOW}[!] ${1}${NC}"; }
-info() { echo -e "${BLUE}[i] ${1}${NC}"; }
+warning() { echo -e "${YELLOW}[⚠] ${1}${NC}"; }
+error() { echo -e "${RED}[✗] ${1}${NC}"; }
 
 #######################################
-# 核心功能
+# 核心功能函数
 #######################################
 
-install() {
-  header
-  info "开始安装 Hysteria..."
+show_help() {
+  cat <<EOF
+Usage: $0 [COMMAND|OPTIONS]
+
+安装模式:
+  $0 [--port PORT] [--password PASS]  # 传统安装方式
+  $0 install [--port PORT] [--password PASS]
+
+卸载模式:
+  $0 uninstall
+
+其他:
+  $0 help  # 显示帮助
+
+参数说明:
+  --port PORT      监听端口 (默认: ${DEFAULT_PORT})
+  --password PASS  认证密码 (默认: 随机生成)
+
+示例:
+  # 传统安装方式
+  $0 --port 443 --password mypass
   
-  # 交互式配置
-  read -p "请输入监听端口 [${DEFAULT_PORT}]: " port
-  port=${port:-$DEFAULT_PORT}
+  # 专业安装方式
+  $0 install --port 443
   
-  read -p "是否自定义密码？(y/N) " -n 1 -r
-  echo
-  if [[ $REPLY =~ ^[Yy]$ ]]; then
-    read -p "请输入密码: " password
-  else
-    password=$(openssl rand -base64 18 | tr -d '\n')
-    info "已生成随机密码"
+  # 卸载
+  $0 uninstall
+EOF
+  exit 0
+}
+
+create_service_user() {
+  deluser hysteria 2>/dev/null || true
+  delgroup hysteria 2>/dev/null || true
+
+  if ! grep -q "^hysteria:" /etc/group; then
+    addgroup -S hysteria || {
+      error "无法创建hysteria组"
+      return 1
+    }
   fi
 
-  separator
-  info "正在安装系统依赖..."
-  for pkg in wget openssl; do
-    if ! command -v "$pkg" &>/dev/null; then
-      apk add --no-cache "$pkg" >/dev/null || error "依赖安装失败"
-    fi
-  done
+  adduser -S -D -H -G hysteria hysteria || {
+    error "无法创建hysteria用户"
+    return 1
+  }
+}
 
-  # 创建专用用户
-  if ! id hysteria &>/dev/null; then
-    addgroup -S hysteria >/dev/null 2>&1 || warning "创建用户组失败，将使用root运行"
-    adduser -S -D -H -G hysteria hysteria >/dev/null 2>&1 || HYSTERIA_USER="root"
-  fi
+generate_password() {
+  openssl rand -base64 18 | tr -d '\n'
+}
 
-  # 下载核心程序
-  info "下载核心组件..."
-  wget -q -O "${INSTALL_DIR}/hysteria" \
-    "https://github.com/apernet/hysteria/releases/download/app/${HYSTERIA_VERSION}/hysteria-linux-amd64" \
-    || error "下载失败"
-  chmod +x "${INSTALL_DIR}/hysteria"
-
-  # 生成配置文件
-  mkdir -p "${CONFIG_DIR}"
-  cat > "${CONFIG_DIR}/config.yaml" <<EOF
-listen: :${port}
+generate_config() {
+  cat <<EOF
+listen: :${1}
 tls:
-  cert: ${CONFIG_DIR}/server.crt
-  key: ${CONFIG_DIR}/server.key
+  cert: /etc/hysteria/server.crt
+  key: /etc/hysteria/server.key
 auth:
   type: password
-  password: ${password}
+  password: ${2}
 masquerade:
   type: proxy
   proxy:
     url: https://bing.com/
     rewriteHost: true
 EOF
+}
 
-  # 生成自签名证书
-  openssl ecparam -genkey -name prime256v1 -out "${CONFIG_DIR}/server.key"
-  openssl req -new -x509 -days 3650 -key "${CONFIG_DIR}/server.key" \
-    -out "${CONFIG_DIR}/server.crt" \
+generate_cert() {
+  openssl ecparam -genkey -name prime256v1 -out /etc/hysteria/server.key
+  openssl req -new -x509 -days 3650 -key /etc/hysteria/server.key \
+    -out /etc/hysteria/server.crt \
     -subj "/C=US/ST=California/L=San Francisco/O=Hysteria/CN=bing.com"
-  chmod 600 "${CONFIG_DIR}/server.key"
+  chmod 600 /etc/hysteria/server.key
+}
 
-  # 配置系统服务
-  cat > /etc/init.d/hysteria <<EOF
+create_service() {
+  cat > /etc/init.d/hysteria <<'EOF'
 #!/sbin/openrc-run
 name="hysteria"
-command="${INSTALL_DIR}/hysteria"
-command_args="server --config ${CONFIG_DIR}/config.yaml"
-pidfile="/var/run/\${name}.pid"
+command="/usr/local/bin/hysteria"
+command_args="server --config /etc/hysteria/config.yaml"
+pidfile="/var/run/${name}.pid"
 command_background="yes"
 
 depend() {
@@ -117,77 +117,159 @@ depend() {
 }
 EOF
   chmod +x /etc/init.d/hysteria
-  rc-update add hysteria >/dev/null
-  /etc/init.d/hysteria start >/dev/null || error "服务启动失败"
-
-  # 安装完成输出
-  separator
-  success "Hysteria 安装完成！"
-  echo -e "${BOLD}▸ 监听端口:${NC} ${port}"
-  echo -e "${BOLD}▸ 认证密码:${NC} ${password}"
-  echo -e "${BOLD}▸ 配置文件:${NC} ${CONFIG_DIR}/config.yaml"
-  separator
-  echo -e "${BLUE}管理命令:${NC}"
-  echo -e "启动服务: rc-service hysteria start"
-  echo -e "停止服务: rc-service hysteria stop"
-  echo -e "查看状态: rc-service hysteria status"
 }
 
-uninstall() {
-  header
-  warning "即将完全卸载 Hysteria！"
-  read -p "确认继续卸载？(y/N) " -n 1 -r
-  echo
-  [[ $REPLY =~ ^[Yy]$ ]] || exit 0
+#######################################
+# 安装功能
+#######################################
 
+install_hysteria() {
+  local port="$DEFAULT_PORT"
+  local password="$(generate_password)"
+  
+  # 参数解析
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --port) port="$2"; shift 2 ;;
+      --password) password="$2"; shift 2 ;;
+      *) shift ;;
+    esac
+  done
+
+  info "=== 正在安装Hysteria ==="
+  
+  # 安装依赖
+  for pkg in wget openssl; do
+    if ! command -v "$pkg" &>/dev/null; then
+      info "安装依赖: $pkg..."
+      apk add --no-cache "$pkg" || {
+        error "依赖安装失败"
+        exit 1
+      }
+    fi
+  done
+
+  # 创建用户
+  if ! create_service_user; then
+    warning "将使用root用户运行服务"
+    HYSTERIA_USER="root"
+  else
+    HYSTERIA_USER="hysteria"
+  fi
+  
+  # 下载二进制
+  info "下载Hysteria v${HYSTERIA_VERSION}..."
+  wget -q -O /usr/local/bin/hysteria \
+    "https://github.com/apernet/hysteria/releases/download/app/${HYSTERIA_VERSION}/hysteria-linux-amd64" || {
+    error "下载失败"
+    exit 1
+  }
+  chmod +x /usr/local/bin/hysteria
+
+  # 生成配置
+  info "生成配置文件..."
+  mkdir -p /etc/hysteria
+  generate_config "$port" "$password" > /etc/hysteria/config.yaml
+  generate_cert
+
+  # 设置权限
+  info "设置文件权限..."
+  chown -R "${HYSTERIA_USER:-root}:hysteria" /etc/hysteria
+  chmod 640 /etc/hysteria/config.yaml
+
+  # 配置服务
+  info "配置系统服务..."
+  create_service
+  rc-update add hysteria >/dev/null
+
+  # 启动服务
+  info "启动服务..."
+  if ! /etc/init.d/hysteria start; then
+    error "服务启动失败"
+    exit 1
+  fi
+
+  # 输出结果
+  success "Hysteria 安装成功！"
+  echo -e "
+  ${BLUE}▸ 监听端口: ${YELLOW}${port}
+  ${BLUE}▸ 认证密码: ${YELLOW}${password}
+  ${BLUE}▸ 配置文件: ${YELLOW}/etc/hysteria/config.yaml${NC}
+
+  ${GREEN}管理命令:${NC}
+  ${BLUE}启动: ${NC}rc-service hysteria start
+  ${BLUE}停止: ${NC}rc-service hysteria stop
+  ${BLUE}状态: ${NC}rc-service hysteria status
+  "
+}
+
+#######################################
+# 卸载功能
+#######################################
+
+uninstall_hysteria() {
+  info "=== 正在卸载Hysteria ==="
+  
   # 停止服务
   if [ -f /etc/init.d/hysteria ]; then
-    info "停止运行中的服务..."
-    /etc/init.d/hysteria stop >/dev/null 2>&1 || true
-    rc-update del hysteria >/dev/null 2>&1 || true
+    info "停止服务..."
+    /etc/init.d/hysteria stop 2>/dev/null || true
+    rc-update del hysteria 2>/dev/null || true
     rm -f /etc/init.d/hysteria
   fi
 
-  # 清理文件
-  info "清理系统文件..."
-  rm -f "${INSTALL_DIR}/hysteria"
-  rm -rf "${CONFIG_DIR}"
-
   # 删除用户
-  if id hysteria &>/dev/null; then
-    info "移除专用用户..."
-    deluser hysteria >/dev/null 2>&1 || true
-    delgroup hysteria >/dev/null 2>&1 || true
-  fi
+  info "清理用户..."
+  deluser hysteria 2>/dev/null || true
+  delgroup hysteria 2>/dev/null || true
 
-  success "Hysteria 已完全卸载"
+  # 删除文件
+  info "删除文件..."
+  rm -f /usr/local/bin/hysteria
+  rm -rf /etc/hysteria
+
+  success "卸载完成！所有相关文件已清理"
 }
 
 #######################################
-# 主交互界面
+# 主流程控制
 #######################################
 
-main_menu() {
-  header
-  echo -e "${BOLD}请选择操作:${NC}"
-  echo
-  echo -e "  ${GREEN}1${NC}) 安装 Hysteria"
-  echo -e "  ${RED}2${NC}) 卸载 Hysteria"
-  echo -e "  ${BLUE}3${NC}) 退出脚本"
-  echo
-  separator
+parse_arguments() {
+  local main_command="install"
+  local args=()
 
-  read -p "请输入选项 (1-3): " choice
-  case $choice in
-    1) install ;;
-    2) uninstall ;;
-    3) exit 0 ;;
-    *) error "无效选项";;
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      install|uninstall|help)
+        main_command="$1"
+        shift
+        ;;
+      --help|-h)
+        show_help
+        ;;
+      --*)
+        args+=("$1" "$2")
+        shift 2
+        ;;
+      *)
+        error "未知参数: $1"
+        show_help
+        exit 1
+        ;;
+    esac
+  done
+
+  case "$main_command" in
+    install) install_hysteria "${args[@]}" ;;
+    uninstall) uninstall_hysteria ;;
+    help) show_help ;;
   esac
 }
 
-# 启动主菜单
-while true; do
-  main_menu
-  read -p "按回车键返回主菜单..." -n 1 -r
-done
+# 兼容传统调用方式
+if [[ "$1" =~ ^-- ]]; then
+  install_hysteria "$@"
+else
+  parse_arguments "$@"
+fi
