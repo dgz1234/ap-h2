@@ -2,8 +2,24 @@
 set -euo pipefail
 
 #######################################
-# 函数定义区（纯函数，不调用其他函数）
+# 函数定义区
 #######################################
+
+# 显示帮助信息
+show_help() {
+  cat <<EOF
+Usage: $0 [OPTIONS]
+Options:
+  --port PORT      设置监听端口 (默认: 33810)
+  --password PASS  设置认证密码 (默认: 随机生成)
+  --help           显示帮助信息
+
+示例:
+  $0 --port 443 --password mypassword
+  $0 --port 8080
+EOF
+  exit 0
+}
 
 # 安装系统依赖
 install_dependencies() {
@@ -123,10 +139,36 @@ create_service_user() {
 }
 
 #######################################
-# 主程序执行区（清晰的工作流程）
+# 主程序执行区
 #######################################
 
 main() {
+  # 默认值
+  local port=33810
+  local password="$(generate_random_password)"
+
+  # 解析命令行参数
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --port)
+        port="$2"
+        shift 2
+        ;;
+      --password)
+        password="$2"
+        shift 2
+        ;;
+      --help)
+        show_help
+        ;;
+      *)
+        echo "未知选项: $1" >&2
+        show_help
+        exit 1
+        ;;
+    esac
+  done
+
   # 阶段1：环境准备
   install_dependencies
   create_service_user
@@ -140,8 +182,7 @@ main() {
 
   # 阶段3：配置生成
   mkdir -p /etc/hysteria/
-  local service_password="$(generate_random_password)"
-  generate_config_yaml "${port:-33810}" "$service_password" > /etc/hysteria/config.yaml
+  generate_config_yaml "$port" "$password" > /etc/hysteria/config.yaml
   chmod 640 /etc/hysteria/config.yaml
 
   # 阶段4：证书生成
@@ -166,8 +207,8 @@ main() {
   # 阶段8：输出结果
   cat <<EOF
 [成功] Hysteria2 安装完成 (${HYSTERIA_VERSION})
-▸ 端口: ${port:-33810}
-▸ 密码: ${service_password}
+▸ 端口: ${port}
+▸ 密码: ${password}
 ▸ 配置文件: /etc/hysteria/config.yaml
 ▸ 日志文件: /var/log/hysteria.log
 
