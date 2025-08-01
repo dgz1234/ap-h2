@@ -82,7 +82,7 @@ wget_with_retry() {
 # 下载指定版本的二进制
 # 示例版本(注释掉)
 # HYSTERIA_VERSION="v2.6.1"
-HYSTERIA_VERSION="${HYSTERIA_VERSION:-v2.6.1}"
+HYSTERIA_VERSION="${HYSTERIA_VERSION:-v2.6.2}"
 wget_with_retry "https://github.com/dgz1234/ap-h2/raw/main/hysteria-linux-amd64-${HYSTERIA_VERSION}" /usr/local/bin/hysteria
 chmod +x /usr/local/bin/hysteria
 
