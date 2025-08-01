@@ -1,48 +1,104 @@
-# Hysteria 部署方案
+Hysteria 部署方案
 
-## █ 模式对比卡片
+🌟 核心特性
+双模式部署架构
+极速命令行模式	bash <(curl...)	批量部署/CI集成	全自动非交互
 
-<div style="display: flex; justify-content: space-between; margin: 2em 0;">
+智能交互模式	bash <(curl...1.sh)	首次配置/调试	可视化引导
 
-<div style="width: 48%; border: 1px solid #30363d; border-radius: 6px; padding: 16px; background-color: #0d1117;">
-<h3 style="color: #58a6ff; border-bottom: 1px solid #30363d; padding-bottom: 8px;">🚀 极速命令行模式</h3>
-<pre style="background-color: #161b22; padding: 12px; border-radius: 6px; overflow-x: auto;">
-<span style="color: #79c0ff;">bash</span> <(curl -fsSL https://raw.githubusercontent.com/.../install_hysteria.sh)</pre>
-<ul style="padding-left: 20px; color: #c9d1d9;">
-<li><strong>适用场景：</strong>CI/CD 流水线、批量部署</li>
-<li><strong>核心优势：</strong>30秒极速完成</li>
-<li><strong>交互方式：</strong>全自动非交互</li>
-</ul>
-</div>
+🚀 极速命令行模式
 
-<div style="width: 48%; border: 1px solid #30363d; border-radius: 6px; padding: 16px; background-color: #0d1117;">
-<h3 style="color: #58a6ff; border-bottom: 1px solid #30363d; padding-bottom: 8px;">🖥 智能交互模式</h3>
-<pre style="background-color: #161b22; padding: 12px; border-radius: 6px; overflow-x: auto;">
-<span style="color: #79c0ff;">bash</span> <(curl -fsSL https://raw.githubusercontent.com/.../install_hysteria1.sh)</pre>
-<ul style="padding-left: 20px; color: #c9d1d9;">
-<li><strong>适用场景：</strong>首次配置、参数调试</li>
-<li><strong>核心优势：</strong>可视化引导</li>
-<li><strong>交互方式：</strong>每一步确认</li>
-</ul>
-</div>
-
-</div>
-
-## █ 极速模式使用示例
-
-```bash
-# 基础部署（默认配置）
-bash <(curl...)
+快速查看帮助
+```
+bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/main/install_hysteria.sh) --help
 ```
 
-# 带参数部署
-```bash
-bash <(curl...) --port 443 --password "Your$tr0ngP@ss"
+使用示例
+
+# 传统安装方式：
+
+基础部署 (使用默认配置)
 ```
-# 专业语法
-bash <(curl...) install --port 3017
+bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/refs/heads/main/install_hysteria.sh)
+```
 
-# 卸载指令
-bash <(curl...) uninstall
+自定义端口部署
+```
+bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/refs/heads/main/install_hysteria.sh) --port 443
+```
+
+完全自定义部署
+```
+bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/refs/heads/main/install_hysteria.sh) --port 443 --password "Your$tr0ngP@ss"
+```
+
+# 专业安装方式：
+```
+bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/refs/heads/main/install_hysteria.sh) install --port 3017
+```
+
+# 卸载方式：
+```
+bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/refs/heads/main/install_hysteria.sh) uninstall
+```
 
 
+🖥 智能交互模式
+
+使用演示
+
+启动界面：
+
+text
+=== Hysteria 一键管理脚本 ===
+▪ 版本: v2.6.2
+▪ 系统: Alpine Linux 3.18
+──────────────────────────────
+请选择操作:
+
+1) 安装 Hysteria
+2) 卸载 Hysteria
+3) 退出脚本
+
+──────────────────────────────
+请输入选项 (1-3): 
+安装过程：
+
+text
+[i] 开始安装 Hysteria...
+请输入监听端口 [2516]: 3017
+是否自定义密码？(y/N): n
+[i] 已生成随机密码
+──────────────────────────────
+[i] 正在安装系统依赖...
+[i] 下载核心组件...
+──────────────────────────────
+[✓] Hysteria 安装完成！
+──────────────────────────────
+▸ 监听端口: 3017
+▸ 认证密码: Xb8kLm9pQw3zRtY6NvS2
+▸ 配置文件: /etc/hysteria/config.yaml
+──────────────────────────────
+管理命令:
+启动服务: rc-service hysteria start
+停止服务: rc-service hysteria stop
+查看状态: rc-service hysteria status
+卸载过程：
+
+text
+=== Hysteria 一键管理脚本 ===
+[!] 即将完全卸载 Hysteria！
+确认继续卸载？(y/N): y
+[i] 停止运行中的服务...
+[i] 清理系统文件...
+[i] 移除专用用户...
+[✓] Hysteria 已完全卸载
+这个版本通过交互式菜单实现专业化的安装/卸载管理，同时保持传统脚本的简洁性，所有操作无需记忆参数，适合各种技术水平的用户使用
+
+安装命令
+
+```
+bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/refs/heads/main/install_hysteria1.sh)
+```
+
+注：所有安装脚本会自动清理临时文件，不会在系统中留下冗余数据
