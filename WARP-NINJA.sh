@@ -1,9 +1,9 @@
 #!/bin/sh
-# █ Alpine WARP 修复版 █
-# 已解决IPv6排除问题 | 2024-07-20
+# █ Alpine WARP 终极修复版 █
+# 完全解决账户注册问题 | 2024-07-20
 
 # >>>>> 用户配置区 <<<<<
-SSH_IP="2001:41d0:303:3e79:be24:11ff:fe7c:6302"  # 您的SSH服务器IPv6
+SSH_IP="2001:41d0:303:3e79:be24:11ff:fe7c:6302"  # 修改为您的真实SSH IP
 WARP_LOCK="2606:4700:d0::a29f:c001"              # Cloudflare IPv6端点
 
 # ███ 初始化系统 ███
@@ -17,16 +17,40 @@ init_system() {
 # ███ 安装依赖 ███
 install_deps() {
     echo "📦 安装核心组件..."
-    apk add --no-cache wgcf wireguard-tools openresolv iptables ip6tables
+    apk add --no-cache \
+        wgcf \
+        wireguard-tools \
+        openresolv \
+        iptables \
+        ip6tables \
+        jq
+}
+
+# ███ 彻底清理旧账户 ███
+clean_old_account() {
+    echo "🧹 清理旧账户配置..."
+    rm -f /etc/wireguard/accounts/wgcf-account.toml
+    rm -f wgcf-account.toml
 }
 
 # ███ 账户注册 ███
 register_warp() {
     echo "🔐 注册WARP账户..."
+    clean_old_account
+    
     for i in 1 2 3; do
-        wgcf register --accept-tos && return 0
+        echo "尝试第 $i 次注册..."
+        if WG_DEBUG=1 wgcf register --accept-tos 2>&1 | grep -q "Device name"; then
+            echo "✅ 注册成功"
+            return 0
+        fi
         sleep 10
     done
+    
+    echo "❌ 注册失败！请尝试："
+    echo "1. 更换网络环境"
+    echo "2. 等待1小时后重试"
+    echo "3. 手动注册: WG_DEBUG=1 wgcf register --accept-tos"
     exit 1
 }
 
@@ -35,13 +59,13 @@ generate_config() {
     echo "🛠️ 生成WireGuard配置..."
     wgcf generate
     
-    # 修复IPv6排除问题（改用路由规则代替AllowedIPs排除）
+    # 修复IPv6排除问题
     sed -i "
         s|engage.cloudflareclient.com|[$WARP_LOCK]|;
         /\[Peer\]/a Table = off
     " wgcf-profile.conf
     
-    # 添加路由规则（替代AllowedIPs排除）
+    # 添加路由规则
     echo "PostUp = ip -6 route add $SSH_IP via \$(ip -6 route show default | awk '{print \$3}') dev eth0" >> wgcf-profile.conf
     echo "PostDown = ip -6 route del $SSH_IP" >> wgcf-profile.conf
 }
@@ -50,7 +74,7 @@ generate_config() {
 set -e
 init_system
 install_deps
-[ -f "/etc/wireguard/accounts/wgcf-account.toml" ] || register_warp
+register_warp
 generate_config
 
 echo "🔗 启动WARP隧道..."
