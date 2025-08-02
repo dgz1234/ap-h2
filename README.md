@@ -10,7 +10,7 @@
 
 快速查看帮助
 ```
-bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/main/install_hysteria.sh) --help
+bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/main/install_hysteria.sh) help
 ```
 
 使用示例
@@ -105,3 +105,4 @@ bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/refs/heads/mai
 ```
 
 注：所有安装脚本会自动清理临时文件，不会在系统中留下冗余数据
+
