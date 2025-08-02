@@ -45,7 +45,7 @@ register_warp() {
 generate_config() {
     echo "🛠️ 生成WireGuard配置..."
     wgcf generate
-    
+
     # 安全隔离SSH流量
     sed -i "
         s|engage.cloudflareclient.com|[$WARP_LOCK]|;
