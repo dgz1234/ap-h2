@@ -1,119 +1,170 @@
-#!/bin/sh
-# █ Alpine WARP 终极稳定版 █
-# 网络波动防护 | 智能重试 | 2024-07-20
+#!/bin/bash
 
-# >>>>> 全局配置 <<<<<
-readonly CONF_FILE="/etc/wireguard/wgcf-profile.conf"
-readonly ACCOUNT_FILE="/etc/wireguard/accounts/wgcf-account.toml"
-readonly WARP_TEST_IP="2606:4700:d0::a29f:c001"
-readonly API_TIMEOUT=10  # 关键操作超时(秒)
+# ==============================================
+# Alpine Linux WARP 配置脚本
+# 功能：
+#   1. 检查/添加edge仓库
+#   2. 安装必要依赖
+#   3. 管理WARP账户注册
+# 设计特点：
+#   - 完整的彩色输出系统
+#   - 完善的错误处理
+#   - 用户交互选项
+# ==============================================
 
-# >>>>> 工具函数 <<<<<
-# 带超时的命令执行
-safe_run() {
-    timeout "$API_TIMEOUT" "$@" >/dev/null 2>&1
-    case $? in
-        0) return 0 ;;
-        124|137) return 1 ;;  # timeout
+# 颜色定义
+RED='\033[0;31m'      # 错误/警告
+GREEN='\033[0;32m'    # 成功
+YELLOW='\033[1;33m'   # 提示/警告
+BLUE='\033[0;34m'     # 信息
+PURPLE='\033[0;35m'   # 操作中
+NC='\033[0m'          # 重置颜色
+
+# 常量定义
+REPO_FILE="/etc/apk/repositories"
+EDGE_MAIN="http://dl-cdn.alpinelinux.org/alpine/edge/main"
+EDGE_TESTING="http://dl-cdn.alpinelinux.org/alpine/edge/testing"
+DEPENDENCIES=("wgcf" "wireguard-tools" "openresolv" "iptables" "ip6tables")
+ACCOUNT_FILE="/etc/wireguard/accounts/wgcf-account.toml"
+MAX_RETRIES=3
+
+# ==============================================
+# 功能函数：彩色打印
+# 参数：
+#   $1: 颜色代码
+#   $2: 消息内容
+# ==============================================
+function print_msg {
+    echo -e "${1}${2}${NC}"
+}
+
+# ==============================================
+# 功能函数：用户确认
+# 参数：
+#   $1: 提示信息
+# 返回：
+#   0: 用户确认
+#   1: 用户取消
+# ==============================================
+function confirm {
+    read -p "$(echo -e "${YELLOW}${1} [y/N]: ${NC}")" choice
+    case "$choice" in
+        y|Y) return 0 ;;
         *) return 1 ;;
     esac
 }
 
-# >>>>> 清理函数 <<<<<
-cleanup() {
-    wg-quick down wgcf-profile 2>/dev/null || true
-    rm -f /tmp/wgcf-*.tmp 2>/dev/null
-}
-trap cleanup EXIT TERM INT
-
-# ███ 1. 增强版账户诊断 ███
-diagnose_account() {
-    # 级别1: 文件存在性
-    [ -f "$ACCOUNT_FILE" ] || return 1
+# ==============================================
+# 功能函数：带重试的命令执行
+# 参数：
+#   $1: 命令
+#   $2: 成功消息
+#   $3: 错误消息
+#   $4: 最大重试次数
+# ==============================================
+function execute_with_retry {
+    local cmd="$1"
+    local success_msg="$2"
+    local error_msg="$3"
+    local max_retries=${4:-1}
+    local retry_count=0
     
-    # 级别2: 私钥有效性
-    grep -q "private_key" "$ACCOUNT_FILE" || return 1
-    
-    # 级别3: API连通性 (带网络状态检测)
-    status_output=$(safe_run wgcf status && wgcf status)
-    if [ $? -ne 0 ]; then
-        if ping -c1 -W3 1.1.1.1 >/dev/null 2>&1; then
-            return 2  # API服务异常
-        else
-            return 3  # 完全断网
-        fi
-    fi
-
-    # 级别4: 账户类型
-    case $(echo "$status_output" | awk -F': ' '/Account type:/ {print $2}') in
-        "Free"|"Team"|"Premium") return 0 ;;
-        *) return 1 ;;
-    esac
-}
-
-# ███ 2. 抗波动注册流程 ███
-register_warp() {
-    # 清理残留文件
-    rm -f "$ACCOUNT_FILE" "$CONF_FILE" 2>/dev/null
-
-    # 指数退避重试
-    for attempt in 1 2 3; do
-        if safe_run wgcf register --accept-tos && \
-           safe_run wgcf generate && \
-           [ -s "$CONF_FILE" ]; then
-            [ -f "$CONF_FILE" ] && chmod 600 "$CONF_FILE"
+    while [ $retry_count -lt $max_retries ]; do
+        print_msg "$PURPLE" "尝试 $((retry_count+1))/$max_retries: 执行 $cmd"
+        
+        if eval "$cmd"; then
+            print_msg "$GREEN" "√ $success_msg"
             return 0
         fi
-        sleep $((attempt * 5))
+        
+        ((retry_count++))
+        
+        if [ $retry_count -lt $max_retries ]; then
+            sleep 1
+        fi
     done
+    
+    print_msg "$RED" "× $error_msg (尝试 $max_retries 次后失败)"
     return 1
 }
 
-# ███ 3. 稳健隧道控制 ███
-start_tunnel() {
-    # 清理残留接口
-    ip link delete dev wgcf-profile 2>/dev/null || true
+# ==============================================
+# 第一部分：检查并添加edge仓库
+# ==============================================
+print_msg "$BLUE" "[1/4] 检查Alpine edge仓库..."
 
-    # 启动隧道 (带重试)
-    for _ in 1 2 3; do
-        if wg-quick up "$CONF_FILE" 2>/dev/null; then
-            # 验证接口
-            if ip link show dev wgcf-profile >/dev/null 2>&1; then
-                # 隔离IPv4
-                ip -4 route delete default dev wgcf-profile 2>/dev/null || true
-
-                # 测试IPv6 (允许少量丢包)
-                if ping -6 -c2 -W5 "$WARP_TEST_IP" >/dev/null 2>&1; then
-                    return 0
-                fi
-            fi
-        fi
-        sleep 3
-    done
-    return 1
-}
-
-# ███ 主流程 ███
-case $(diagnose_account) in
-    0) ;;  # 账户正常
-    1) 
-        if ! register_warp; then
-            exit 1
-        fi
-        ;;
-    2|3) 
-        if [ ! -f "$CONF_FILE" ]; then
-            exit 1
-        fi
-        ;;
-esac
-
-if [ -f "$CONF_FILE" ]; then
-    if start_tunnel; then
-        exit 0
+if grep -q "$EDGE_MAIN" "$REPO_FILE" && grep -q "$EDGE_TESTING" "$REPO_FILE"; then
+    print_msg "$GREEN" "√ 源文件已包含edge仓库"
+else
+    print_msg "$YELLOW" "! 检测到缺少edge仓库"
+    
+    # 添加仓库
+    echo -e "\n# 添加Alpine Edge仓库\n$EDGE_MAIN\n$EDGE_TESTING\n" >> "$REPO_FILE"
+    
+    if grep -q "$EDGE_MAIN" "$REPO_FILE"; then
+        print_msg "$GREEN" "√ 源文件已成功添加edge仓库"
     else
+        print_msg "$RED" "× 添加edge仓库失败"
         exit 1
     fi
-else
-    exit 1
+    
+    # 更新仓库
+    if apk update; then
+        print_msg "$GREEN" "√ 仓库更新成功"
+    else
+        print_msg "$RED" "× 仓库更新失败"
+        exit 1
+    fi
 fi
+
+# ==============================================
+# 第二部分：安装依赖工具
+# ==============================================
+print_msg "$BLUE" "\n[2/4] 安装必要依赖工具..."
+
+for pkg in "${DEPENDENCIES[@]}"; do
+    if apk info -e "$pkg" >/dev/null 2>&1; then
+        print_msg "$GREEN" "√ $pkg 已安装"
+    else
+        print_msg "$YELLOW" "! 正在安装 $pkg..."
+        if apk add --no-cache "$pkg"; then
+            print_msg "$GREEN" "√ $pkg 安装成功"
+        else
+            print_msg "$RED" "× $pkg 安装失败"
+            exit 1
+        fi
+    fi
+done
+
+# ==============================================
+# 第三部分：检查WARP账户
+# ==============================================
+print_msg "$BLUE" "\n[3/4] 检查WARP账户配置..."
+
+if [ -f "$ACCOUNT_FILE" ]; then
+    print_msg "$YELLOW" "! 检测到已存在的账户文件: $ACCOUNT_FILE"
+    if confirm "是否保留现有账户配置？"; then
+        print_msg "$GREEN" "√ 保留现有账户配置"
+        exit 0
+    else
+        print_msg "$YELLOW" "! 正在删除现有账户文件..."
+        rm -f "$ACCOUNT_FILE"
+    fi
+fi
+
+# 创建账户目录
+mkdir -p "$(dirname "$ACCOUNT_FILE")"
+
+# ==============================================
+# 第四部分：注册WARP账户
+# ==============================================
+print_msg "$BLUE" "\n[4/4] 注册Cloudflare WARP账户..."
+
+register_cmd="wgcf register --accept-tos --config $ACCOUNT_FILE"
+execute_with_retry "$register_cmd" "WARP账户注册成功" "WARP账户注册失败" $MAX_RETRIES || {
+    if confirm "注册失败，是否退出脚本？"; then
+        exit 1
+    fi
+}
+
+print_msg "$GREEN" "\n√ 所有操作已完成！"
