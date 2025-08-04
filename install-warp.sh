@@ -8,7 +8,7 @@
 #   3. 管理WARP账户注册
 #   4. 生成WireGuard配置
 # 设计特点：
-#   - 彩色输出系统
+#   - 完整的彩色输出系统
 #   - 完善的错误处理
 #   - 用户交互选项
 # ==============================================
@@ -160,11 +160,33 @@ done
 # ==============================================
 print_msg "$BLUE" "\n[5/5] WireGuard 配置文件生成..."
 
+# 生成配置文件
 generate_cmd="wgcf generate --config $ACCOUNT_FILE -p $CONFIG_FILE"
 if $generate_cmd; then
     print_msg "$GREEN" "√ WireGuard 配置文件生成成功"
-    print_msg "$GREEN" "\n√ 所有操作已完成！配置文件保存在: $CONFIG_FILE"
 else
     print_msg "$RED" "× WireGuard 配置文件生成失败"
     exit 1
 fi
+
+# 修改配置文件
+print_msg "$YELLOW" "! 正在优化配置文件..."
+sed -i 's/^DNS =/# DNS =/' "$CONFIG_FILE" && \
+sed -i 's/^AllowedIPs = .*/AllowedIPs = 0.0.0.0\/0/' "$CONFIG_FILE" && \
+print_msg "$GREEN" "√ 配置文件优化完成" || \
+print_msg "$RED" "× 配置文件优化失败"
+
+# 询问是否启动WireGuard
+if confirm "是否立即启动WireGuard？"; then
+    print_msg "$BLUE" "启动WireGuard..."
+    wg-quick up wgcf 2>/dev/null
+    if [ $? -eq 0 ]; then
+        print_msg "$GREEN" "√ WireGuard 启动成功！"
+        print_msg "$GREEN" "当前DNS配置："
+        cat /etc/resolv.conf
+    else
+        print_msg "$RED" "× WireGuard 启动失败！"
+    fi
+fi
+
+print_msg "$GREEN" "\n√ 所有操作已完成！配置文件保存在: $CONFIG_FILE"
