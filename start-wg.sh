@@ -1,15 +1,21 @@
 #!/bin/bash
 
 # 定义颜色代码
-BLUE='\033[0;34m'     # 蓝色：信息/操作中
-GREEN='\033[0;32m'      # 绿色：成功
-YELLOW='\033[1;33m'    # 黄色：警告/提示
-RED='\033[0;31m'        # 红色：错误
-PURPLE='\033[0;35m'     # 紫色：重试操作
-NC='\033[0m'            # 重置颜色
+BLUE='\033[0;34m'     # 信息/操作中
+GREEN='\033[0;32m'    # 成功
+YELLOW='\033[1;33m'   # 警告/提示
+RED='\033[0;31m'      # 错误
+PURPLE='\033[0;35m'   # 重试操作
+NC='\033[0m'          # 重置颜色
 
-# 函数：显示带颜色的消息
-function show_msg() {
+# 检查root权限
+if [ "$(id -u)" -ne 0 ]; then
+    echo -e "${RED}[错误] 请使用root用户执行本脚本${NC}"
+    exit 1
+fi
+
+# 显示彩色消息函数
+show_msg() {
     case $1 in
         info) echo -e "${BLUE}[信息] $2${NC}" ;;
         success) echo -e "${GREEN}[成功] $2${NC}" ;;
@@ -19,59 +25,72 @@ function show_msg() {
     esac
 }
 
-# 函数：回滚操作
-function rollback() {
-    show_msg "warning" "正在执行回滚操作..."
-    # 删除可能已创建的文件
-    [ -f "/etc/wireguard/wgcf.conf" ] && rm -f "/etc/wireguard/wgcf.conf" && show_msg "info" "已删除配置文件"
+# Alpine专用回滚函数
+rollback() {
+    show_msg warning "正在执行回滚操作..."
+    # 删除配置文件
+    [ -f "/etc/wireguard/wgcf.conf" ] && {
+        rm -f "/etc/wireguard/wgcf.conf"
+        show_msg info "已删除配置文件"
+    }
+    # 卸载新安装的包
+    local installed=()
+    for pkg in wireguard-tools iptables; do
+        if apk info -e $pkg >/dev/null 2>&1; then
+            installed+=("$pkg")
+        fi
+    done
+    [ ${#installed[@]} -gt 0 ] && {
+        apk del --no-cache "${installed[@]}" >/dev/null 2>&1
+        show_msg info "已卸载包: ${installed[*]}"
+    }
     exit 1
 }
 
 # 1. 检查WireGuard内核模块
-show_msg "info" "正在检查WireGuard内核模块是否存在......"
+show_msg info "正在检查WireGuard内核模块..."
 if lsmod | grep -q wireguard; then
-    show_msg "success" "WireGuard内核模块已加载"
+    show_msg success "WireGuard内核模块已加载"
 else
-    show_msg "error" "WireGuard内核模块未加载，请先加载模块"
-    exit 1
+    show_msg warning "尝试加载WireGuard内核模块..."
+    modprobe wireguard 2>/dev/null || {
+        show_msg error "内核模块加载失败，请先执行："
+        echo -e "  apk add --no-cache wireguard-tools linux-lts-wireguard"
+        echo -e "  modprobe wireguard"
+        exit 1
+    }
+    show_msg success "内核模块加载成功"
 fi
 
-# 2. 检查并安装依赖工具
-show_msg "info" "正在安装相关依赖.工具................"
-for tool in wireguard-tools iptables; do
-    if command -v $tool &>/dev/null; then
-        show_msg "success" "$tool 已安装，跳过"
+# 2. 检查Alpine依赖包
+show_msg info "正在检查必需软件包..."
+for pkg in wireguard-tools iptables; do
+    if apk info -e $pkg >/dev/null 2>&1; then
+        show_msg success "$pkg 已安装"
     else
-        show_msg "info" "正在安装 $tool ..."
-        if apt-get install -y $tool &>/dev/null || yum install -y $tool &>/dev/null; then
-            show_msg "success" "$tool 安装成功"
-        else
-            show_msg "error" "$tool 安装失败"
+        show_msg info "正在安装 $pkg..."
+        if ! apk add --no-cache $pkg >/dev/null 2>&1; then
+            show_msg error "$pkg 安装失败"
             rollback
         fi
+        show_msg success "$pkg 安装完成"
     fi
 done
 
-# 3. 检查配置文件是否存在
-show_msg "info" "正在检测配置文件是否存在..."
+# 3. 检查配置文件目录
 CONFIG_FILE="/etc/wireguard/wgcf.conf"
+show_msg info "正在检查配置文件..."
 if [ -f "$CONFIG_FILE" ]; then
-    show_msg "warning" "配置文件已存在，将使用现有文件"
+    show_msg warning "配置文件已存在，将追加配置"
 else
-    show_msg "info" "正在创建配置文件..."
     mkdir -p /etc/wireguard
-    touch "$CONFIG_FILE"
-    if [ $? -eq 0 ]; then
-        show_msg "success" "配置空文件已生成"
-    else
-        show_msg "error" "配置文件创建失败"
-        rollback
-    fi
+    chmod 700 /etc/wireguard
+    show_msg success "配置目录已创建"
 fi
 
 # 4. 写入配置文件
-show_msg "info" "WireGuard 配置文件写入中...."
-cat > "$CONFIG_FILE" <<EOF
+show_msg info "正在生成WireGuard配置..."
+cat > "$CONFIG_FILE" <<-EOF
 [Interface]
 PrivateKey = $(wg genkey)
 Address = 172.16.0.2/32, 2606:4700:110:8da4:c505:b2c:f503:c10b/128
@@ -84,30 +103,26 @@ AllowedIPs = 0.0.0.0/0
 Endpoint = engage.cloudflareclient.com:2408
 EOF
 
-# 检查文件是否写入成功
-if [ $? -eq 0 ]; then
-    chmod 600 "$CONFIG_FILE"
-    show_msg "success" "配置文件写入成功并已设置权限"
-else
-    show_msg "error" "配置文件写入失败"
-    rollback
-fi
+# 设置配置文件权限
+chmod 600 "$CONFIG_FILE"
+show_msg success "配置文件已生成并设置权限"
 
-# 5. 用户确认是否启动
-read -p "$(echo -e ${YELLOW}"是否要立即启动WireGuard? (y/n): "${NC})" choice
+# 5. 用户确认启动
+read -p "$(echo -e ${YELLOW}"是否立即启动WireGuard? [y/N] "${NC})" choice
 case "$choice" in
-    y|Y )
-        show_msg "info" "正在启动WireGuard..."
-        wg-quick up wgcf
-        if [ $? -eq 0 ]; then
-            show_msg "success" "WireGuard启动成功"
+    y|Y)
+        show_msg info "正在启动WireGuard..."
+        if wg-quick up wgcf; then
+            show_msg success "WireGuard启动成功"
             wg show
         else
-            show_msg "error" "WireGuard启动失败"
+            show_msg error "WireGuard启动失败"
             rollback
         fi
         ;;
-    * )
-        show_msg "info" "您选择不启动WireGuard，脚本结束"
+    *)
+        show_msg info "您可以选择稍后手动启动："
+        echo -e "  wg-quick up wgcf"
+        echo -e "  wg-quick down wgcf"
         ;;
 esac
