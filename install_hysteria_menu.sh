@@ -75,11 +75,23 @@ install_dependencies() {
 # 获取最新版本号
 get_latest_version() {
     info "正在查询最新版本..."
-    latest_version=$(wget -qO- https://api.github.com/repos/apernet/hysteria/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-    if [ -z "$latest_version" ]; then
-        error "无法获取最新版本号"
+    temp_file=$(mktemp)
+    if ! wget -qO- https://api.github.com/repos/apernet/hysteria/releases/latest > "$temp_file"; then
+        error "无法获取版本信息"
+        rm -f "$temp_file"
         return 1
     fi
+    
+    latest_version=$(grep '"tag_name":' "$temp_file" | sed -E 's/.*"([^"]+)".*/\1/')
+    rm -f "$temp_file"
+    
+    if [ -z "$latest_version" ]; then
+        error "无法解析版本号"
+        return 1
+    fi
+    
+    # 再次清理可能残留的控制字符
+    latest_version=$(echo "$latest_version" | tr -d '[:cntrl:]')
     success "最新版本: $latest_version"
     echo "$latest_version"
     return 0
