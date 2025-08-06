@@ -84,7 +84,7 @@ install_hysteria() {
 
     read -p "请输入密码 (留空将自动生成): " password
     if [ -z "$password" ]; then
-        password=$(openssl rand -base64 18 | tr -d '\n')
+        password=$(tr -dc 'A-Za-z0-9,+=!@#%^&*()_-' < /dev/urandom | head -c 24)
         info "已生成随机密码: ${password}"
     fi
 
