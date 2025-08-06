@@ -45,9 +45,9 @@ linux/amd64)，最新版本为 (app/v2.6.2)
 ```
 管理命令：
 ```
-启动服务: rc-service hysteria start
-停止服务: rc-service hysteria stop
-查看状态: rc-service hysteria status
+启动服务: hysteria start
+停止服务: hysteria stop
+查看状态: hysteria status
 ```
 卸载过程：
 ```
