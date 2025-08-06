@@ -215,9 +215,10 @@ show_installation_result() {
     echo "hysteria2://${password}@${ipv4}:${port}?sni=www.bing.com&alpn=h3&insecure=1#alpine-hysteria"
     if [ -n "$ipv6" ] && [ "$ipv6" != "你的IPv6地址" ]; then
         echo "hysteria2://${password}@[${ipv6}]:${port}?sni=www.bing.com&alpn=h3&insecure=1#alpine-hysteria-ipv6"
-        echo -e "${RED}重要提示:${NC}"
-        echo "如果你使用了warp类工具，那你需要将节点导入客户端后，将ip替换为你机器的真实外网ip"
     fi
+    echo "===================================="
+    echo -e "${RED}重要提示:${NC}"
+    echo "如果你使用了warp类工具，那你需要将节点导入客户端后，将ip替换为你机器的真实外网ip"
     echo "===================================="
     echo -e "${YELLOW}服务管理命令:${NC}"
     echo "启动: /etc/init.d/hysteria start"
