@@ -20,26 +20,13 @@ show_header() {
     clear
     echo -e "${BLUE}"
     echo "  _   _ _   _ _____ _____ ____  ___ ____  "
-    echo " | | | | | | |_   _| ____|  _ \|_ _|  _ \ "
+    echo " | | | | | | |_   _| ____|  _ \\|_ _|  _ \\ "
     echo " | |_| | | | | | | |  _| | |_) || || |_) |"
     echo " |  _  | |_| | | | | |___|  _ < | ||  __/ "
-    echo " |_| |_|\___/  |_| |_____|_| \_\___|_|    "
+    echo " |_| |_|\\___/  |_| |_____|_| \\_\\___|_|    "
     echo -e "${NC}"
     echo -e "${YELLOW}Alpine Linux Hysteria2 安装脚本${NC}"
     echo "===================================="
-}
-
-# 检查IPv4支持
-check_ipv4() {
-    info "网络环境检测中......"
-    if ping -c 1 -W 1 1.1.1.1 >/dev/null 2>&1; then
-        success "网络环境正常 (IPv4支持)"
-        return 0
-    else
-        error "您的网络需要IPv4支持"
-        warning "如果您使用的是LXC容器-IPv6-only-无NAT64网关，建议先安装WARP"
-        return 1
-    fi
 }
 
 # 安装依赖
@@ -58,7 +45,7 @@ install_dependencies() {
     return 0
 }
 
-# 获取最新版本号（只输出干净版本号，不含颜色或日志）
+# 获取最新版本号
 get_latest_version() {
     temp_file=$(mktemp)
     if ! wget -qO- https://api.github.com/repos/apernet/hysteria/releases/latest > "$temp_file"; then
@@ -67,16 +54,12 @@ get_latest_version() {
     fi
     latest_version=$(grep '"tag_name":' "$temp_file" | sed -E 's/.*"([^"]+)".*/\1/' | tr -d '[:space:]')
     rm -f "$temp_file"
-    if [ -z "$latest_version" ]; then
-        return 1
-    fi
-    echo "$latest_version"
-    return 0
+    [ -n "$latest_version" ] && echo "$latest_version" && return 0
+    return 1
 }
 
 # 安装 hysteria
 install_hysteria() {
-    check_ipv4 || return 1
     install_dependencies || return 1
 
     read -p "请输入监听端口 (默认: 443): " port
@@ -86,6 +69,27 @@ install_hysteria() {
     if [ -z "$password" ]; then
         password=$(openssl rand -base64 18 | tr -d '\n')
         info "已生成随机密码: ${password}"
+    fi
+
+    # 判断 IPv4 支持（使用 curl 实测）
+    if curl -s --max-time 2 -4 https://api.ipify.org >/dev/null; then
+        success "检测到 IPv4 支持，使用公网查询方式获取 IP"
+        ipv4=$(wget -qO- -4 https://api.ipify.org || echo "")
+        ipv6=$(wget -qO- -6 https://api.ipify.org || echo "")
+    else
+        warning "未检测到有效 IPv4，当前为 IPv6-only 环境"
+        ipv4=""
+        read -p "请输入公网 IPv6 地址（留空则自动检测）: " user_ipv6
+        if [ -n "$user_ipv6" ]; then
+            ipv6="$user_ipv6"
+        else
+            default_iface=$(ip -6 route show default | awk '{print $5}' | head -n 1)
+            if [ -n "$default_iface" ]; then
+                ipv6=$(ip -6 addr show dev "$default_iface" | grep -oP '(?<=inet6\\s)[0-9a-f:]+(?=/)' | grep -v '^fe80' | head -n 1)
+            else
+                ipv6=""
+            fi
+        fi
     fi
 
     if ! id "hysteria" >/dev/null 2>&1; then
@@ -199,23 +203,32 @@ EOF
     }
     success "系统服务已配置"
 
-    show_installation_result "$port" "$password"
+    show_installation_result "$port" "$password" "$ipv4" "$ipv6"
 }
 
 # 显示安装结果
 show_installation_result() {
     local port=$1
     local password=$2
-    ipv4=$(wget -qO- -4 https://api.ipify.org || echo "你的IPv4地址")
-    ipv6=$(wget -qO- -6 https://api.ipify.org || echo "你的IPv6地址")
+    local ipv4=$3
+    local ipv6=$4
 
     echo -e "${GREEN}\nHysteria 安装完成！${NC}"
     echo "===================================="
     echo -e "${BLUE}以下是节点信息:${NC}"
-    echo "hysteria2://${password}@${ipv4}:${port}?sni=www.bing.com&alpn=h3&insecure=1#alpine-hysteria"
-    if [ -n "$ipv6" ] && [ "$ipv6" != "你的IPv6地址" ]; then
+
+    if [ -n "$ipv4" ]; then
+        echo "hysteria2://${password}@${ipv4}:${port}?sni=www.bing.com&alpn=h3&insecure=1#alpine-hysteria"
+    fi
+
+    if [ -n "$ipv6" ]; then
         echo "hysteria2://${password}@[${ipv6}]:${port}?sni=www.bing.com&alpn=h3&insecure=1#alpine-hysteria-ipv6"
     fi
+
+    if [ -z "$ipv4" ] && [ -z "$ipv6" ]; then
+        warning "未能检测到公网 IP 地址，请手动替换链接中的 IP"
+    fi
+
     echo "===================================="
     echo -e "${YELLOW}服务管理命令:${NC}"
     echo "启动: /etc/init.d/hysteria start"
