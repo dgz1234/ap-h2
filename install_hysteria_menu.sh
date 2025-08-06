@@ -80,7 +80,7 @@ install_hysteria() {
     install_dependencies || return 1
 
     read -p "请输入监听端口 (默认: 36711): " port
-    port=${port:-443}
+    port=${port:-36711}
 
     read -p "请输入密码 (留空将自动生成): " password
     if [ -z "$password" ]; then
