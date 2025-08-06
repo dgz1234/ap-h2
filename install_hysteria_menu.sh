@@ -81,17 +81,16 @@ get_latest_version() {
         rm -f "$temp_file"
         return 1
     fi
-    
-    latest_version=$(grep '"tag_name":' "$temp_file" | sed -E 's/.*"([^"]+)".*/\1/')
+
+    raw_version=$(grep '"tag_name":' "$temp_file" | sed -E 's/.*"([^"]+)".*/\1/')
     rm -f "$temp_file"
-    
-    if [ -z "$latest_version" ]; then
+
+    if [ -z "$raw_version" ]; then
         error "无法解析版本号"
         return 1
     fi
-    
-    # 再次清理可能残留的控制字符
-    latest_version=$(echo "$latest_version" | tr -d '[:cntrl:]')
+
+    latest_version=$(echo "$raw_version" | tr -d '[:cntrl:]')
     success "最新版本: $latest_version"
     echo "$latest_version"
     return 0
@@ -99,25 +98,20 @@ get_latest_version() {
 
 # 安装Hysteria
 install_hysteria() {
-    # 检查IPv4支持
     check_ipv4 || return 1
-    
-    # 安装依赖
     install_dependencies || return 1
-    
-    # 获取用户输入
+
     info "请输入监听端口 (默认: 443)"
     read -p "端口: " port
     port=${port:-443}
-    
+
     info "请输入密码 (留空将自动生成)"
     read -p "密码: " password
     if [ -z "$password" ]; then
         password=$(openssl rand -base64 18 | tr -d '\n')
         info "已生成随机密码: ${password}"
     fi
-    
-    # 创建专用用户
+
     if ! id "hysteria" >/dev/null 2>&1; then
         info "正在创建专用用户 hysteria..."
         adduser -D -H -s /sbin/nologin hysteria || {
@@ -128,11 +122,9 @@ install_hysteria() {
     else
         info "专用用户 hysteria 已存在"
     fi
-    
-    # 获取最新版本
+
     latest_version=$(get_latest_version) || return 1
-    
-    # 检查现有安装
+
     if [ -f "/usr/local/bin/hysteria" ]; then
         current_version=$(/usr/local/bin/hysteria version | awk '{print $3}')
         if [ "$current_version" = "$latest_version" ]; then
@@ -147,8 +139,7 @@ install_hysteria() {
             fi
         fi
     fi
-    
-    # 下载最新版本
+
     if [ ! -f "/usr/local/bin/hysteria" ]; then
         info "正在下载 hysteria $latest_version..."
         arch=$(uname -m)
@@ -157,8 +148,10 @@ install_hysteria() {
             aarch64) arch="arm64" ;;
             *) arch="amd64" ;;
         esac
-        
+
         download_url="https://github.com/apernet/hysteria/releases/download/$latest_version/hysteria-linux-$arch"
+        info "下载地址: $download_url"
+
         wget -O /usr/local/bin/hysteria "$download_url" || {
             error "下载失败"
             return 1
@@ -166,11 +159,9 @@ install_hysteria() {
         chmod +x /usr/local/bin/hysteria
         success "hysteria 下载完成并已安装到 /usr/local/bin/hysteria"
     fi
-    
-    # 创建配置目录
+
     mkdir -p /etc/hysteria
-    
-    # 生成TLS证书
+
     if [ ! -f "/etc/hysteria/server.key" ] || [ ! -f "/etc/hysteria/server.crt" ]; then
         info "正在生成自签名证书..."
         openssl ecparam -genkey -name prime256v1 -out /etc/hysteria/server.key
@@ -181,8 +172,7 @@ install_hysteria() {
     else
         info "检测到现有TLS证书，跳过生成"
     fi
-    
-    # 生成配置文件
+
     if [ ! -f "/etc/hysteria/config.yaml" ]; then
         info "正在生成配置文件..."
         cat > /etc/hysteria/config.yaml <<EOF
@@ -204,8 +194,7 @@ EOF
     else
         info "检测到现有配置文件，跳过生成"
     fi
-    
-    # 配置系统服务
+
     info "正在配置系统服务..."
     cat > /etc/init.d/hysteria <<EOF
 #!/sbin/openrc-run
@@ -228,8 +217,7 @@ EOF
         return 1
     }
     success "系统服务已配置"
-    
-    # 显示安装结果
+
     show_installation_result "$port" "$password"
 }
 
@@ -237,11 +225,10 @@ EOF
 show_installation_result() {
     local port=$1
     local password=$2
-    
-    # 获取IP地址
+
     ipv4=$(wget -qO- -4 https://api.ipify.org || echo "你的IPv4地址")
     ipv6=$(wget -qO- -6 https://api.ipify.org || echo "你的IPv6地址")
-    
+
     echo -e "${GREEN}"
     echo "Hysteria 安装完成！"
     echo "===================================="
@@ -266,8 +253,7 @@ show_installation_result() {
 # 卸载Hysteria
 uninstall_hysteria() {
     info "正在卸载 Hysteria..."
-    
-    # 停止并删除服务
+
     if [ -f "/etc/init.d/hysteria" ]; then
         /etc/init.d/hysteria stop >/dev/null 2>&1
         rc-update del hysteria >/dev/null 2>&1
@@ -276,31 +262,28 @@ uninstall_hysteria() {
     else
         info "未找到服务文件，跳过服务移除"
     fi
-    
-    # 删除二进制文件
+
     if [ -f "/usr/local/bin/hysteria" ]; then
         rm -f /usr/local/bin/hysteria
         success "二进制文件已移除"
     else
         info "未找到二进制文件，跳过移除"
     fi
-    
-    # 删除配置文件和证书
+
     if [ -d "/etc/hysteria" ]; then
         rm -rf /etc/hysteria
         success "配置文件和证书已移除"
     else
         info "未找到配置文件目录，跳过移除"
     fi
-    
-    # 删除用户
+
     if id "hysteria" >/dev/null 2>&1; then
         deluser hysteria >/dev/null 2>&1
         success "专用用户已移除"
     else
         info "未找到专用用户，跳过移除"
     fi
-    
+
     success "Hysteria 已完全卸载"
 }
 
@@ -315,23 +298,14 @@ main_menu() {
         echo -e "${NC}"
         echo "===================================="
         read -p "请输入选项 [1-3]: " choice
-        
+
         case $choice in
-            1)
-                install_hysteria
-                ;;
-            2)
-                uninstall_hysteria
-                ;;
-            3)
-                info "退出脚本"
-                exit 0
-                ;;
-            *)
-                error "选择错误，请重新输入"
-                ;;
+            1) install_hysteria ;;
+            2) uninstall_hysteria ;;
+            3) info "退出脚本"; exit 0 ;;
+            *) error "选择错误，请重新输入" ;;
         esac
-        
+
         read -p "按回车键返回主菜单..."
     done
 }
