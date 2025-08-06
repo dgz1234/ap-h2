@@ -79,9 +79,8 @@ install() {
 
   # 下载核心程序
   info "正在下载核心组件..."
-  wget --no-check-certificate -q -O "${INSTALL_DIR}/hysteria" \
-    "https://github.com/apernet/hysteria/releases/download/app/${HYSTERIA_VERSION}/hysteria-linux-amd64" \
-    || { error "下载失败"; return 1; }
+  wget -q -O "${INSTALL_DIR}/hysteria" \
+    "https://github.com/apernet/hysteria/releases/download/app/${HYSTERIA_VERSION}/hysteria-linux-amd64" || { error "下载失败"; return 1; }
   chmod +x "${INSTALL_DIR}/hysteria"
   success "核心组件下载完成"
 
