@@ -91,36 +91,23 @@ bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/refs/heads/mai
 
 快速查看帮助
 ```
-bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/main/install_hysteria.sh) --help
+bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/main/install_hysteria_command.sh) help
 ```
-
-使用示例
-
-# 传统安装方式：
-
 基础部署 (使用默认配置)
 ```
-bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/refs/heads/main/install_hysteria.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/refs/heads/main/install_hysteria_command.sh)
 ```
-
 自定义端口部署
 ```
-bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/refs/heads/main/install_hysteria.sh) --port 443
+bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/refs/heads/main/install_hysteria_command.sh) --port 443
 ```
-
 完全自定义部署
 ```
-bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/refs/heads/main/install_hysteria.sh) --port 443 --password "Your$tr0ngP@ss"
+bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/refs/heads/main/install_hysteria_command.sh) --port 443 --password "Your$tr0ngP@ss"
 ```
-
-# 专业安装方式：
-```
-bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/refs/heads/main/install_hysteria.sh) install --port 3017
-```
-
 # 卸载方式：
 ```
-bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/refs/heads/main/install_hysteria.sh) uninstall
+bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/refs/heads/main/install_hysteria_command.sh) uninstall
 ```
 
 
