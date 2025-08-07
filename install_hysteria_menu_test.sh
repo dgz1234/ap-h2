@@ -113,12 +113,15 @@ install_hysteria() {
     success "最新版本: $latest_version"
 
     if [ -f "/usr/local/bin/hysteria" ]; then
-        current_version=$(/usr/local/bin/hysteria version 2>/dev/null | grep -Eo 'v[0-9]+\.[0-9]+\.[0-9]+' | sed 's/^v//')
+        current_version=$(/usr/local/bin/hysteria version 2>/dev/null | head -n 1 | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+')
         if [ -n "$current_version" ]; then
-            if [ "$current_version" = "$latest_version" ]; then
-                success "当前已安装最新版本 ($latest_version)，跳过下载"
-        else
-                warning "发现旧版本 ($current_version)，最新版本为 ($latest_version)"
+            # 标准化最新版本号（去除app/v前缀）
+            clean_latest_version=$(echo "$latest_version" | sed 's/^app\/v//')
+
+            if [ "$current_version" = "$clean_latest_version" ]; then
+                success "当前已安装最新版本 ($clean_latest_version)，跳过下载"
+            else
+                warning "发现旧版本 ($current_version)，最新版本为 ($clean_latest_version)"
                 read -p "是否更新到最新版本? [y/N] " update_choice
                 if [[ "$update_choice" =~ ^[Yy]$ ]]; then
                     rm -f /usr/local/bin/hysteria
