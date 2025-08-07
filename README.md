@@ -2,6 +2,13 @@
 
 ## 🌟 核心特性
 
+通过安装
+```
+bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/main/install-warp.sh)
+```
+完美支持
+0.43机器类型:Alpine Linux-LXC容器-IPv6-only-无NAT64网关-wireguard内核支持-客户端root-60G内存-90M磁盘
+
 ## 🖥 智能交互模式
 
 使用演示
