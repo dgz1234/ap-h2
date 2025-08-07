@@ -69,7 +69,7 @@ get_latest_version() {
         rm -f "$temp_file"
         return 1
     fi
-    latest_version=$(grep '"tag_name":' "$temp_file" | sed -E 's/.*"([^"]+)".*/\1/' | tr -d '[:space:]')
+    latest_version=$(grep '"tag_name":' "$temp_file" | sed -E 's/.*"(v?[0-9]+\.[0-9]+\.[0-9]+)".*/\1/' | tr -d '[:space:]')
     rm -f "$temp_file"
     if [ -z "$latest_version" ]; then
         return 1
