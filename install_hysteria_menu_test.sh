@@ -69,7 +69,8 @@ get_latest_version() {
         rm -f "$temp_file"
         return 1
     fi
-    latest_version=$(grep '"tag_name":' "$temp_file" | sed -E 's/.*"(v?[0-9]+\.[0-9]+\.[0-9]+)".*/\1/' | tr -d '[:space:]')
+    # 更精确的版本提取方法
+    latest_version=$(grep '"tag_name":' "$temp_file" | cut -d'"' -f4 | sed 's/^v//')
     rm -f "$temp_file"
     if [ -z "$latest_version" ]; then
         return 1
@@ -77,7 +78,6 @@ get_latest_version() {
     echo "$latest_version"
     return 0
 }
-
 # 安装 hysteria
 install_hysteria() {
     check_ipv4 || return 1
