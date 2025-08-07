@@ -206,31 +206,46 @@ EOF
 show_installation_result() {
     local port=$1
     local password=$2
-    # 方法1：优先使用Cloudflare检测服务
-    cloudflare_output=$(curl --interface eth0 -s https://www.cloudflare.com/cdn-cgi/trace 2>/dev/null)
-    cloudflare_ip=$(echo "$cloudflare_output" | grep -oP 'ip=\K[0-9a-f.:]+')
-
-    if [ -n "$cloudflare_ip" ]; then
-        # 严格区分IPv4和IPv6赋值
-        if [[ "$cloudflare_ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-            ipv4="$cloudflare_ip"
-            ipv6=$(wget -qO- -6 https://api.ipify.org 2>/dev/null || echo "未检测到IPv6地址")
-        else
-            ipv6="$cloudflare_ip"
-            ipv4=$(wget -qO- -4 https://api.ipify.org 2>/dev/null || echo "未检测到IPv4地址")
-        fi
-        echo "使用Cloudflare检测结果"
+    # 初始化变量
+    ipv4="未检测到IPv4地址"
+    ipv6="未检测到IPv6地址"
+    
+    # 方法1：使用Cloudflare检测服务（兼容Alpine LXC）
+    cloudflare_detect() {
+        # 使用wget替代curl（Alpine默认不带curl）
+        wget -qO- --timeout=3 --bind-address=$(ip route show default | awk '/default/ {print $9}') \
+            https://www.cloudflare.com/cdn-cgi/trace 2>/dev/null | \
+            grep -E '^ip=' | cut -d= -f2
+    }
+    
+    # 优先尝试Cloudflare检测
+    if cloudflare_ip=$(cloudflare_detect); then
+        # 判断IP类型（兼容BusyBox）
+        case "$cloudflare_ip" in
+            *.*.*.*)
+                ipv4="$cloudflare_ip"
+                echo "Cloudflare检测到IPv4: $ipv4"
+                ;;
+            *:*)
+                ipv6="$cloudflare_ip"
+                echo "Cloudflare检测到IPv6: $ipv6"
+                ;;
+            *)
+                echo "Cloudflare返回无效IP格式"
+                ;;
+        esac
     else
-        # 方法2：Cloudflare检测失败，使用备用API
-        ipv4=$(wget -qO- -4 https://api.ipify.org 2>/dev/null || echo "未检测到IPv4地址")
-        ipv6=$(wget -qO- -6 https://api.ipify.org 2>/dev/null || echo "未检测到IPv6地址")
-        echo "使用备用API检测结果"
+        # 方法2：Cloudflare检测失败时使用备用API
+        echo "Cloudflare检测失败，使用备用API"
+        ipv4=$(wget -4 -qO- --timeout=3 https://api.ipify.org 2>/dev/null || echo "未检测到IPv4地址")
+        ipv6=$(wget -6 -qO- --timeout=3 https://api6.ipify.org 2>/dev/null || echo "未检测到IPv6地址")
     fi
-
-    # 输出结果（带类型验证）
-    echo "验证通过的IPv4地址: $ipv4" | grep -E '([0-9]{1,3}\.){3}[0-9]{1,3}|未检测到IPv4地址'
-    echo "验证通过的IPv6地址: $ipv6" | grep -E '([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}|未检测到IPv6地址'
-
+    
+    # 最终输出
+    echo "----------------------"
+    echo "最终检测结果："
+    echo "IPv4: $ipv4"
+    echo "IPv6: $ipv6"
     # ipv4=$(wget -qO- -4 https://api.ipify.org || echo "你的IPv4地址")
     # ipv6=$(wget -qO- -6 https://api.ipify.org || echo "你的IPv6地址")
 
