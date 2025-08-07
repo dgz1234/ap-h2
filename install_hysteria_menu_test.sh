@@ -63,6 +63,7 @@ install_dependencies() {
 }
 
 # 获取最新版本号（只输出干净版本号，不含颜色或日志）
+# 修改 get_latest_version 函数
 get_latest_version() {
     temp_file=$(mktemp)
     if ! wget -qO- https://api.github.com/repos/apernet/hysteria/releases/latest > "$temp_file"; then
@@ -78,6 +79,7 @@ get_latest_version() {
     echo "$latest_version"
     return 0
 }
+
 # 安装 hysteria
 install_hysteria() {
     check_ipv4 || return 1
@@ -111,9 +113,10 @@ install_hysteria() {
     success "最新版本: $latest_version"
 
     if [ -f "/usr/local/bin/hysteria" ]; then
-        current_version=$(/usr/local/bin/hysteria version 2>/dev/null | awk '{print $3}')
-        if [ "$current_version" = "$latest_version" ]; then
-            success "当前已安装最新版本 ($latest_version)，跳过下载"
+        current_version=$(/usr/local/bin/hysteria version 2>/dev/null | grep -Eo 'v[0-9]+\.[0-9]+\.[0-9]+' | sed 's/^v//')
+        if [ -n "$current_version" ]; then
+            if [ "$current_version" = "$latest_version" ]; then
+                success "当前已安装最新版本 ($latest_version)，跳过下载"
         else
             warning "发现旧版本 ($current_version)，最新版本为 ($latest_version)"
             read -p "是否更新到最新版本? [y/N] " update_choice
@@ -121,6 +124,7 @@ install_hysteria() {
                 rm -f /usr/local/bin/hysteria
             else
                 info "跳过更新"
+                return 0
             fi
         fi
     fi
