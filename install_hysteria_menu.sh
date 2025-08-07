@@ -206,8 +206,33 @@ EOF
 show_installation_result() {
     local port=$1
     local password=$2
-    ipv4=$(wget -qO- -4 https://api.ipify.org || echo "你的IPv4地址")
-    ipv6=$(wget -qO- -6 https://api.ipify.org || echo "你的IPv6地址")
+    # 方法1：优先使用Cloudflare检测服务
+    cloudflare_output=$(curl --interface eth0 -s https://www.cloudflare.com/cdn-cgi/trace 2>/dev/null)
+    cloudflare_ip=$(echo "$cloudflare_output" | grep -oP 'ip=\K[0-9a-f.:]+')
+
+    if [ -n "$cloudflare_ip" ]; then
+        # 严格区分IPv4和IPv6赋值
+        if [[ "$cloudflare_ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+            ipv4="$cloudflare_ip"
+            ipv6=$(wget -qO- -6 https://api.ipify.org 2>/dev/null || echo "未检测到IPv6地址")
+        else
+            ipv6="$cloudflare_ip"
+            ipv4=$(wget -qO- -4 https://api.ipify.org 2>/dev/null || echo "未检测到IPv4地址")
+        fi
+        echo "使用Cloudflare检测结果"
+    else
+        # 方法2：Cloudflare检测失败，使用备用API
+        ipv4=$(wget -qO- -4 https://api.ipify.org 2>/dev/null || echo "未检测到IPv4地址")
+        ipv6=$(wget -qO- -6 https://api.ipify.org 2>/dev/null || echo "未检测到IPv6地址")
+        echo "使用备用API检测结果"
+    fi
+
+    # 输出结果（带类型验证）
+    echo "验证通过的IPv4地址: $ipv4" | grep -E '([0-9]{1,3}\.){3}[0-9]{1,3}|未检测到IPv4地址'
+    echo "验证通过的IPv6地址: $ipv6" | grep -E '([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}|未检测到IPv6地址'
+
+    # ipv4=$(wget -qO- -4 https://api.ipify.org || echo "你的IPv4地址")
+    # ipv6=$(wget -qO- -6 https://api.ipify.org || echo "你的IPv6地址")
 
     echo -e "${GREEN}\nHysteria 安装完成！${NC}"
     echo "===================================="
