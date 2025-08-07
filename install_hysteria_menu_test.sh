@@ -118,13 +118,14 @@ install_hysteria() {
             if [ "$current_version" = "$latest_version" ]; then
                 success "当前已安装最新版本 ($latest_version)，跳过下载"
         else
-            warning "发现旧版本 ($current_version)，最新版本为 ($latest_version)"
-            read -p "是否更新到最新版本? [y/N] " update_choice
-            if [[ "$update_choice" =~ ^[Yy]$ ]]; then
-                rm -f /usr/local/bin/hysteria
-            else
-                info "跳过更新"
-                return 0
+                warning "发现旧版本 ($current_version)，最新版本为 ($latest_version)"
+                read -p "是否更新到最新版本? [y/N] " update_choice
+                if [[ "$update_choice" =~ ^[Yy]$ ]]; then
+                    rm -f /usr/local/bin/hysteria
+                else
+                    info "跳过更新"
+                    return 0
+                fi
             fi
         fi
     fi
