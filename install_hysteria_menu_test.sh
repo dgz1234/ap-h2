@@ -58,38 +58,18 @@ install_dependencies() {
     return 0
 }
 
+# 获取最新版本号（只输出干净版本号，不含颜色或日志）
 get_latest_version() {
-    # 检查 hysteria 是否已安装
-    if [ ! -x /usr/local/bin/hysteria ]; then
-        warning "未找到 /usr/local/bin/hysteria 文件，跳过版本比对"
-        return 1
-    fi
-
-    # 获取最新版本
     temp_file=$(mktemp)
     if ! wget -qO- https://api.github.com/repos/apernet/hysteria/releases/latest > "$temp_file"; then
         rm -f "$temp_file"
         return 1
     fi
-    latest_version=$(grep '"tag_name":' "$temp_file" | sed -E 's/.*"([^"]+)".*/\\1/' | tr -d '[:space:]')
+    latest_version=$(grep '"tag_name":' "$temp_file" | sed -E 's/.*"([^"]+)".*/\1/' | tr -d '[:space:]')
     rm -f "$temp_file"
-
     if [ -z "$latest_version" ]; then
         return 1
     fi
-
-    # 获取当前版本
-    current_version=$(/usr/local/bin/hysteria version 2>/dev/null | awk '{print $3}')
-
-    if [ "$current_version" = "$latest_version" ]; then
-        success "hysteria 已是最新版本 ($current_version)"
-        read -p "是否重新下载并覆盖现有文件？[y/N] " overwrite_choice
-        if [[ ! "$overwrite_choice" =~ ^[Yy]$ ]]; then
-            info "已取消下载"
-            return 1
-        fi
-    fi
-
     echo "$latest_version"
     return 0
 }
