@@ -32,6 +32,7 @@ show_header() {
     echo -e "${YELLOW}Alpine Linux Hysteria2 安装脚本${NC}"
     echo "===================================="
 }
+
 # ======================== 🔧 工具函数 ========================
 # 检查IPv4支持
 check_ipv4() {
@@ -62,22 +63,40 @@ install_dependencies() {
     return 0
 }
 
-# 获取最新版本号（只输出干净版本号，不含颜色或日志）
-# 修改 get_latest_version 函数
+# 获取最新版本号
 get_latest_version() {
     temp_file=$(mktemp)
     if ! wget -qO- https://api.github.com/repos/apernet/hysteria/releases/latest > "$temp_file"; then
         rm -f "$temp_file"
         return 1
     fi
-    # 更精确的版本提取方法
-    latest_version=$(grep '"tag_name":' "$temp_file" | cut -d'"' -f4 | sed 's/^v//')
+    latest_version=$(grep '"tag_name":' "$temp_file" | cut -d'"' -f4)
     rm -f "$temp_file"
     if [ -z "$latest_version" ]; then
         return 1
     fi
     echo "$latest_version"
     return 0
+}
+
+# 版本比对函数
+compare_versions() {
+    local current_ver=$1
+    local latest_ver=$2
+    
+    # 提取纯净版本号 (如从 "v2.6.2" 或 "app/v2.6.2" 中提取 "2.6.2")
+    current_clean=$(echo "$current_ver" | head -n 1 | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+')
+    latest_clean=$(echo "$latest_ver" | sed 's/^app\/v//;s/^v//')
+    
+    if [ -z "$current_clean" ] || [ -z "$latest_clean" ]; then
+        return 2  # 版本获取失败
+    fi
+    
+    if [ "$current_clean" = "$latest_clean" ]; then
+        return 0  # 版本匹配
+    else
+        return 1  # 版本不匹配
+    fi
 }
 
 # 安装 hysteria
@@ -113,15 +132,17 @@ install_hysteria() {
     success "最新版本: $latest_version"
 
     if [ -f "/usr/local/bin/hysteria" ]; then
-        current_version=$(/usr/local/bin/hysteria version 2>/dev/null | head -n 1 | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+')
-        if [ -n "$current_version" ]; then
-            # 标准化最新版本号（去除app/v前缀）
-            clean_latest_version=$(echo "$latest_version" | sed 's/^app\/v//')
-
-            if [ "$current_version" = "$clean_latest_version" ]; then
-                success "当前已安装最新版本 ($clean_latest_version)，跳过下载"
-            else
-                warning "发现旧版本 ($current_version)，最新版本为 ($clean_latest_version)"
+        current_version=$(/usr/local/bin/hysteria version 2>/dev/null)
+        
+        compare_versions "$current_version" "$latest_version"
+        case $? in
+            0)
+                success "当前已安装最新版本 ($latest_version)，跳过下载"
+                ;;
+            1)
+                current_clean=$(echo "$current_version" | head -n 1 | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+')
+                latest_clean=$(echo "$latest_version" | sed 's/^app\/v//;s/^v//')
+                warning "发现旧版本 ($current_clean)，最新版本为 ($latest_clean)"
                 read -p "是否更新到最新版本? [y/N] " update_choice
                 if [[ "$update_choice" =~ ^[Yy]$ ]]; then
                     rm -f /usr/local/bin/hysteria
@@ -129,8 +150,12 @@ install_hysteria() {
                     info "跳过更新"
                     return 0
                 fi
-            fi
-        fi
+                ;;
+            2)
+                warning "版本比对失败，强制更新"
+                rm -f /usr/local/bin/hysteria
+                ;;
+        esac
     fi
 
     if [ ! -f "/usr/local/bin/hysteria" ]; then
@@ -222,9 +247,8 @@ show_installation_result() {
     ipv4="未检测到IPv4地址"
     ipv6="未检测到IPv6地址"
     
-    # 方法1：使用Cloudflare检测服务（兼容Alpine LXC）
+    # 方法1：使用Cloudflare检测服务
     cloudflare_detect() {
-        # 使用wget替代curl（Alpine默认不带curl）
         wget -qO- --timeout=3 --bind-address=$(ip route show default | awk '/default/ {print $9}') \
             https://www.cloudflare.com/cdn-cgi/trace 2>/dev/null | \
             grep -E '^ip=' | cut -d= -f2
@@ -232,23 +256,12 @@ show_installation_result() {
     
     # 优先尝试Cloudflare检测
     if cloudflare_ip=$(cloudflare_detect); then
-        # 判断IP类型（兼容BusyBox）
         case "$cloudflare_ip" in
-            *.*.*.*)
-                ipv4="$cloudflare_ip"
-                echo "Cloudflare检测到IPv4: $ipv4"
-                ;;
-            *:*)
-                ipv6="$cloudflare_ip"
-                echo "Cloudflare检测到IPv6: $ipv6"
-                ;;
-            *)
-                echo "Cloudflare返回无效IP格式"
-                ;;
+            *.*.*.*) ipv4="$cloudflare_ip" ;;
+            *:*) ipv6="$cloudflare_ip" ;;
         esac
     else
         # 方法2：Cloudflare检测失败时使用备用API
-        echo "Cloudflare检测失败，使用备用API"
         ipv4=$(wget -4 -qO- --timeout=3 https://api.ipify.org 2>/dev/null || echo "未检测到IPv4地址")
         ipv6=$(wget -6 -qO- --timeout=3 https://api6.ipify.org 2>/dev/null || echo "未检测到IPv6地址")
     fi
@@ -262,7 +275,7 @@ show_installation_result() {
     echo "===================================="
     echo -e "${BLUE}以下是节点信息:${NC}"
     echo "hysteria2://${password}@${ipv4}:${port}?sni=www.bing.com&alpn=h3&insecure=1#alpine-hysteria"
-    if [ -n "$ipv6" ] && [ "$ipv6" != "你的IPv6地址" ]; then
+    if [ -n "$ipv6" ] && [ "$ipv6" != "未检测到IPv6地址" ]; then
         echo "hysteria2://${password}@[${ipv6}]:${port}?sni=www.bing.com&alpn=h3&insecure=1#alpine-hysteria-ipv6"
     fi
     echo "===================================="
