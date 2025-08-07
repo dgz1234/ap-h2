@@ -1,5 +1,9 @@
 #!/bin/ash
+# 脚本名称：hysteria_installer.sh
+# 描述：Alpine Linux Hysteria2 安装工具
+# 作者：dgz1234
 
+# ======================== 📦 常量定义 ========================
 # 颜色定义
 BLUE='\033[1;34m'
 GREEN='\033[1;32m'
@@ -29,19 +33,24 @@ show_header() {
     echo "===================================="
 }
 
-# 检查IPv4支持
-check_ipv4() {
-    info "网络环境检测中......"
-    if ping -c 1 -W 1 1.1.1.1 >/dev/null 2>&1; then
-        success "网络环境正常 (IPv4支持)"
-        return 0
-    else
-        error "您的网络需要IPv4支持"
-        warning "如果您使用的是LXC容器-IPv6-only-无NAT64网关，建议先安装WARP"
+# ======================== 🔧 工具函数 ========================
+try() {
+    local custom_msg="$1"  # 接收自定义错误消息
+    shift
+    if ! "$@"; then
+        [ -n "$custom_msg" ] && echo -e "${RED}错误：${custom_msg}${NC}" >&2
         return 1
     fi
 }
-
+# 检查IPv4支持
+check_ipv4() {
+    try "PING测试失败（IPv4不可达）" ping -c 1 -W 2 1.1.1.1 >/dev/null 2>&1 || {
+        echo -e "${YELLOW}建议：如果您使用IPv6-only容器，请安装WARP${NC}" >&2
+        return $?  # 显式传递上级错误码
+    }
+    echo "IPv4网络检测通过"
+    return 0
+}
 # 安装依赖
 install_dependencies() {
     info "正在检测相关依赖..."
@@ -76,7 +85,7 @@ get_latest_version() {
 
 # 安装 hysteria
 install_hysteria() {
-    check_ipv4 || return 1
+    try "关键网络检查失败" check_ipv4 || exit 1
     install_dependencies || return 1
 
     read -p "请输入监听端口 (默认: 36711): " port
