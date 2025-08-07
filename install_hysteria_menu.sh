@@ -246,9 +246,6 @@ show_installation_result() {
     echo "最终检测结果："
     echo "IPv4: $ipv4"
     echo "IPv6: $ipv6"
-    # ipv4=$(wget -qO- -4 https://api.ipify.org || echo "你的IPv4地址")
-    # ipv6=$(wget -qO- -6 https://api.ipify.org || echo "你的IPv6地址")
-
     echo -e "${GREEN}\nHysteria 安装完成！${NC}"
     echo "===================================="
     echo -e "${BLUE}以下是节点信息:${NC}"
@@ -258,7 +255,7 @@ show_installation_result() {
     fi
     echo "===================================="
     echo -e "${RED}重要提示:${NC}"
-    echo "如果你使用了warp类工具，那你需要将节点导入客户端后，将ip替换为你机器的真实外网ip"
+    echo "如果你使用ipv6节点信息，请确认客户端支持IPv6连接"
     echo "===================================="
     echo -e "${YELLOW}服务管理命令:${NC}"
     echo "启动: /etc/init.d/hysteria start"
