@@ -1,5 +1,10 @@
+# 以下代码保持原样，无需修改（开始）
 #!/bin/ash
+# 脚本名称：hysteria_installer.sh
+# 描述：Alpine Linux Hysteria2 安装工具
+# 作者：dgz1234
 
+# ======================== 📦 常量定义 ========================
 # 颜色定义
 BLUE='\033[1;34m'
 GREEN='\033[1;32m'
@@ -26,9 +31,9 @@ show_header() {
     echo " |_| |_|\___/  |_| |_____|_| \_\___|_|    "
     echo -e "${NC}"
     echo -e "${YELLOW}Alpine Linux Hysteria2 安装脚本${NC}"
-    echo "===================================="
+    echo "                                           "
 }
-
+# ======================== 🔧 工具函数 ========================
 # 检查IPv4支持
 check_ipv4() {
     info "网络环境检测中......"
@@ -57,28 +62,103 @@ install_dependencies() {
     fi
     return 0
 }
+# ======================== 🔄 版本检查与更新 ========================
+# 获取远程版本（完美处理 app/v 前缀）
+get_remote_version() {
+    curl -fsSL https://api.github.com/repos/apernet/hysteria/releases/latest |
+    grep '"tag_name":' | 
+    cut -d'"' -f4 |
+    sed 's|^app/v||;s|^v||'  # 同时处理 app/v 和 v 前缀
+}
 
-# 获取最新版本号（只输出干净版本号，不含颜色或日志）
-get_latest_version() {
-    temp_file=$(mktemp)
-    if ! wget -qO- https://api.github.com/repos/apernet/hysteria/releases/latest > "$temp_file"; then
-        rm -f "$temp_file"
+# 获取本地版本（超强兼容）
+get_local_version() {
+    if [ -x "/usr/local/bin/hysteria" ]; then
+        /usr/local/bin/hysteria version 2>/dev/null |
+        grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' |
+        head -1 || echo "get_failed"
+    else
+        echo "not_installed"
+    fi
+}
+# ======================== ⬇️ 分层下载实现 ========================
+_download_and_install() {
+    # 函数: _download_and_install
+    # 用途: 核心安装逻辑 (私有函数)
+    # 参数:
+    #   $1: 下载URL
+    #   $2: 临时文件路径
+    # 返回:
+    #   0: 成功 | 1: 下载失败 | 2: 权限错误
+    local url=$1
+    local tmp_file=$2
+
+    if ! curl -#fSL "$url" -o "$tmp_file"; then
+        error "下载失败"
         return 1
     fi
-    latest_version=$(grep '"tag_name":' "$temp_file" | sed -E 's/.*"([^"]+)".*/\1/' | tr -d '[:space:]')
-    rm -f "$temp_file"
-    if [ -z "$latest_version" ]; then
-        return 1
-    fi
-    echo "$latest_version"
+
+    chmod +x "$tmp_file" || return 2
+    mv "$tmp_file" /usr/local/bin/hysteria || return 3
     return 0
 }
 
+download_hysteria() {
+    # 函数: download_hysteria
+    # 用途: 带架构检测的下载器
+    # 参数:
+    #   $1: 版本号 (如 2.6.2)
+    local version=$1
+    local arch
+    
+    case $(uname -m) in
+        x86_64) arch="amd64" ;;
+        aarch64) arch="arm64" ;;
+        *) error "不支持的架构"; return 1 ;;
+    esac
+
+    local tmp_file=$(mktemp)
+    trap "rm -f '$tmp_file'" EXIT
+
+    info "正在下载 v$version [$arch]..."
+    if _download_and_install \
+       "https://github.com/apernet/hysteria/releases/download/app/v$version/hysteria-linux-$arch" \
+       "$tmp_file"; then
+        success "下载成功"
+    else
+        error "下载失败 (错误码: $?)"
+        return 1
+    fi
+}
+# ======================== 🔄 版本控制 ========================
+check_and_update_version() {
+    local remote=$(get_remote_version) || return 1
+    local local=$(get_local_version)
+
+    case "$local" in
+        "$remote") success "已是最新版 (v$local)"; return 0 ;;
+        "not_installed") info "开始安装 v$remote"; download_hysteria "$remote" ;;
+        "get_failed") warning "修复安装"; download_hysteria "$remote" ;;
+        *) 
+            warning "发现更新 (v$local → v$remote)"
+            read -p "是否更新? [Y/n] " choice
+            case "${choice:-Y}" in
+                [Yy]*) download_hysteria "$remote" ;;
+                *) info "已取消" ;;
+            esac
+            ;;
+    esac
+}
+# 以上代码保持原样，无需修改（结束）
+
 # 安装 hysteria
 install_hysteria() {
+    # 1.检查IPv4支持
     check_ipv4 || return 1
+    # 2.版本控制
+    check_and_update_version || return 1
+    # 3.安装依赖
     install_dependencies || return 1
-
     read -p "请输入监听端口 (默认: 36711): " port
     port=${port:-36711}
 
@@ -98,51 +178,7 @@ install_hysteria() {
     else
         info "专用用户 hysteria 已存在"
     fi
-
-    latest_version=$(get_latest_version)
-    if [ -z "$latest_version" ]; then
-        error "无法获取最新版本"
-        return 1
-    fi
-    success "最新版本: $latest_version"
-
-    if [ -f "/usr/local/bin/hysteria" ]; then
-        current_version=$(/usr/local/bin/hysteria version 2>/dev/null | awk '{print $3}')
-        if [ "$current_version" = "$latest_version" ]; then
-            success "当前已安装最新版本 ($latest_version)，跳过下载"
-        else
-            warning "发现旧版本 ($current_version)，最新版本为 ($latest_version)"
-            read -p "是否更新到最新版本? [y/N] " update_choice
-            if [[ "$update_choice" =~ ^[Yy]$ ]]; then
-                rm -f /usr/local/bin/hysteria
-            else
-                info "跳过更新"
-            fi
-        fi
-    fi
-
-    if [ ! -f "/usr/local/bin/hysteria" ]; then
-        info "正在下载 hysteria $latest_version..."
-        arch=$(uname -m)
-        case $arch in
-            x86_64) arch="amd64" ;;
-            aarch64) arch="arm64" ;;
-            *) arch="amd64" ;;
-        esac
-
-        download_url="https://github.com/apernet/hysteria/releases/download/${latest_version}/hysteria-linux-${arch}"
-        info "下载地址: $download_url"
-
-        wget -O /usr/local/bin/hysteria "$download_url" || {
-            error "下载失败"
-            return 1
-        }
-        chmod +x /usr/local/bin/hysteria
-        success "hysteria 下载完成并已安装到 /usr/local/bin/hysteria"
-    fi
-
     mkdir -p /etc/hysteria
-
     if [ ! -f "/etc/hysteria/server.key" ] || [ ! -f "/etc/hysteria/server.crt" ]; then
         info "正在生成自签名证书..."
         openssl ecparam -genkey -name prime256v1 -out /etc/hysteria/server.key
@@ -263,7 +299,6 @@ show_installation_result() {
     echo "重启: /etc/init.d/hysteria restart"
     echo "状态: /etc/init.d/hysteria status"
 }
-
 # 卸载 hysteria
 uninstall_hysteria() {
     info "正在卸载 Hysteria..."
@@ -273,13 +308,16 @@ uninstall_hysteria() {
     id hysteria >/dev/null 2>&1 && deluser hysteria && success "用户已删除"
     success "Hysteria 已卸载"
 }
-
-# 主菜单
+# ======================== 🖥️ 用户界面 ========================
 main_menu() {
     while true; do
         show_header
+        echo -e "${BLUE}================ 🔄 版本控制 ================${NC}"
+        echo "最新版本: $(get_remote_version)"
+        echo "本地版本: $(get_local_version)"
+        echo echo -e "${GREEN}================ 🖥️ 用户界面 ================${NC}"
         echo -e "${BLUE}1. 安装 hysteria2\n2. 卸载 hysteria2\n3. 退出脚本${NC}"
-        echo "===================================="
+        echo -e "${YELLOW}================ 🚀 脚本入口 ================${NC}"
         read -p "请输入选项 [1-3]: " choice
         case "$choice" in
             1) install_hysteria ;;
@@ -290,6 +328,5 @@ main_menu() {
         read -p "按回车键返回主菜单..."
     done
 }
-
-# 脚本入口
+# ======================== 🚀 脚本入口 ========================
 main_menu
