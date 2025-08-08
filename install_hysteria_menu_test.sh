@@ -128,25 +128,10 @@ echo "最新版本: $(get_remote_version)"
 echo "本地版本: $(get_local_version)"
 read -p "按任意键继续..." -n1 -s
 
-# 安装 hysteria
-install_hysteria() {
-    check_and_update_version
-}
 
 # 主菜单
 main_menu() {
-    while true; do
-        echo -e "${BLUE}1. 安装 hysteria2\n2. 卸载 hysteria2\n3. 退出脚本${NC}"
-        echo "===================================="
-        read -p "请输入选项 [1-3]: " choice
-        case "$choice" in
-            1) install_hysteria ;;
-            2) uninstall_hysteria ;;
-            3) info "退出脚本"; exit 0 ;;
-            *) error "无效选项，请重新输入" ;;
-        esac
-        read -p "按回车键返回主菜单..."
-    done
+    check_and_update_version
 }
 
 # 脚本入口
