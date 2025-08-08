@@ -41,98 +41,103 @@ get_local_version() {
 
 # 以上代码保持原样，无需修改（结束）
 
-# ======================== 🔄 版本检查与更新 ========================
-check_and_update_version() {
-    # 获取版本信息
-    local remote_version=$(get_remote_version)
-    local local_version=$(get_local_version)
+# ======================== ⬇️ 分层下载实现 ========================
+_download_and_install() {
+    # 函数: _download_and_install
+    # 用途: 核心安装逻辑 (私有函数)
+    # 参数:
+    #   $1: 下载URL
+    #   $2: 临时文件路径
+    # 返回:
+    #   0: 成功 | 1: 下载失败 | 2: 权限错误
+    local url=$1
+    local tmp_file=$2
 
-    # 检查版本获取状态
-    if [ -z "$remote_version" ]; then
-        error "无法获取最新版本信息，请检查网络连接"
+    if ! curl -#fSL "$url" -o "$tmp_file"; then
+        error "下载失败"
         return 1
     fi
 
-    # 情况1：未安装
-    if [ "$local_version" = "not_installed" ]; then
-        info "正在为您安装 Hysteria v$remote_version..."
-        download_hysteria "$remote_version"
-        return $?
-    fi
-
-    # 情况2：获取本地版本失败
-    if [ "$local_version" = "get_failed" ]; then
-        warning "无法读取当前版本，将尝试修复安装..."
-        download_hysteria "$remote_version"
-        return $?
-    fi
-
-    # 情况3：版本比对
-    if [ "$local_version" = "$remote_version" ]; then
-        success "您的 Hysteria 已经是最新版 (v$local_version)"
-        return 0
-    else
-        warning "发现新版本可用 (当前: v$local_version → 最新: v$remote_version)"
-        echo -e "${YELLOW}┌───────────────────────────────────────┐"
-        echo -e "│ 是否要更新到最新版本？              │"
-        echo -e "│ [${GREEN}Y${NC}]es 确认更新   [${RED}N${NC}]o 保持当前版本 │"
-        echo -e "└───────────────────────────────────────┘${NC}"
-        read -p "请输入选择 [Y/N]: " choice
-        
-        case "$choice" in
-            [yY]|[yY][eE][sS])
-                info "正在准备更新..."
-                download_hysteria "$remote_version"
-                ;;
-            *)
-                info "已保留当前版本 v$local_version"
-                ;;
-        esac
-    fi
-}
-# ======================== ⬇️ 内部下载实现 ========================
-download_hysteria() {
-    local version=$1
-    info "正在获取 Hysteria v$version 安装包..."
-    
-    # 创建临时目录（自动清理）
-    local tmp_dir=$(mktemp -d)
-    trap "rm -rf '$tmp_dir'" EXIT
-    
-    # 自动检测系统架构
-    case $(uname -m) in
-        x86_64) local arch="amd64" ;;
-        aarch64) local arch="arm64" ;;
-        *) error "抱歉，您的设备架构暂不支持"; return 1 ;;
-    esac
-
-    # 进度显示下载
-    if ! curl -#fSL "https://github.com/apernet/hysteria/releases/download/app/v$version/hysteria-linux-$arch" \
-         -o "$tmp_dir/hysteria"; then
-        error "下载失败，请重试或检查网络"
-        return 2
-    fi
-    
-    # 执行安装
-    chmod +x "$tmp_dir/hysteria"
-    if ! mv "$tmp_dir/hysteria" /usr/local/bin/; then
-        error "安装失败，请尝试使用 sudo 运行"
-        return 3
-    fi
-    
-    success "恭喜！Hysteria 已成功升级到 v$version"
+    chmod +x "$tmp_file" || return 2
+    mv "$tmp_file" /usr/local/bin/hysteria || return 3
     return 0
 }
-# 执行并打印结果
-echo "最新版本: $(get_remote_version)"
-echo "本地版本: $(get_local_version)"
-read -p "按任意键继续..." -n1 -s
 
+download_hysteria() {
+    # 函数: download_hysteria
+    # 用途: 带架构检测的下载器
+    # 参数:
+    #   $1: 版本号 (如 2.6.2)
+    local version=$1
+    local arch
+    
+    case $(uname -m) in
+        x86_64) arch="amd64" ;;
+        aarch64) arch="arm64" ;;
+        *) error "不支持的架构"; return 1 ;;
+    esac
 
-# 主菜单
-main_menu() {
-    check_and_update_version
+    local tmp_file=$(mktemp)
+    trap "rm -f '$tmp_file'" EXIT
+
+    info "正在下载 v$version [$arch]..."
+    if _download_and_install \
+       "https://github.com/apernet/hysteria/releases/download/app/v$version/hysteria-linux-$arch" \
+       "$tmp_file"; then
+        success "安装成功"
+    else
+        error "安装失败 (错误码: $?)"
+        return 1
+    fi
 }
 
-# 脚本入口
-main_menu
+# ======================== 🔄 版本控制 ========================
+check_and_update_version() {
+    local remote=$(get_remote_version) || return 1
+    local local=$(get_local_version)
+
+    case "$local" in
+        "$remote") success "已是最新版 (v$local)"; return 0 ;;
+        "not_installed") info "开始安装 v$remote"; download_hysteria "$remote" ;;
+        "get_failed") warning "修复安装"; download_hysteria "$remote" ;;
+        *) 
+            warning "发现更新 (v$local → v$remote)"
+            read -p "是否更新? [Y/n] " choice
+            case "${choice:-Y}" in
+                [Yy]*) download_hysteria "$remote" ;;
+                *) info "已取消" ;;
+            esac
+            ;;
+    esac
+}
+
+# ======================== 🖥️ 用户界面 ========================
+show_menu() {
+    clear
+    echo -e "${GREEN}=== Hysteria2 管理菜单 ==="
+    echo "1. 检查更新"
+    echo "2. 强制重新安装"
+    echo "3. 退出"
+    echo -e "=========================${NC}"
+}
+
+main() {
+    while true; do
+        show_menu
+        echo "最新版本: $(get_remote_version)"
+        echo "本地版本: $(get_local_version)"
+        
+        read -p "请选择: " choice
+        case "$choice" in
+            1) check_and_update_version ;;
+            2) download_hysteria "$(get_remote_version)" ;;
+            3) exit 0 ;;
+            *) error "无效输入" ;;
+        esac
+        
+        read -n 1 -s -p "按任意键继续..."
+    done
+}
+
+# ======================== 🚀 脚本入口 ========================
+main
