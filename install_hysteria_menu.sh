@@ -64,13 +64,51 @@ install_dependencies() {
 }
 # ======================== 🔄 版本检查与更新 ========================
 # 获取远程版本（完美处理 app/v 前缀）
+# 版本检查模块 (最终优化版)
 get_remote_version() {
-    curl -fsSL https://api.github.com/repos/apernet/hysteria/releases/latest |
-    grep '"tag_name":' | 
-    cut -d'"' -f4 |
-    sed 's|^app/v||;s|^v||'  # 同时处理 app/v 和 v 前缀
+    local version
+    local max_retries=2
+    local retry_delay=1
+    
+    # 尝试API方式 (带重试机制)
+    for ((i=1; i<=$max_retries; i++)); do
+        version=$(_fetch_via_api)
+        if [ $? -eq 0 ] && [ -n "$version" ]; then
+            echo "$version"
+            return 0
+        else
+            warning "[尝试 $i/$max_retries] API获取失败，等待 ${retry_delay}秒后重试..."
+            sleep $retry_delay
+        fi
+    done
+    
+    # 降级到非API方式
+    warning "正在使用备用方式获取版本..."
+    version=$(_fetch_via_web)
+    
+    if [ -n "$version" ]; then
+        echo "$version"
+    else
+        error "错误：所有版本获取方式均失败"
+        return 1
+    fi
 }
 
+_fetch_via_api() {
+    curl --connect-timeout 5 -fsSL \
+        https://api.github.com/repos/apernet/hysteria/releases/latest 2>/dev/null |
+        grep -o '"tag_name": *"[^"]*"' |
+        cut -d'"' -f4 |
+        sed 's|^app/v||;s|^v||'
+}
+
+_fetch_via_web() {
+    curl -fsSL -I \
+        https://github.com/apernet/hysteria/releases/latest 2>/dev/null |
+        tr -d '\r' |
+        awk -F'/' '/location:/{print $NF}' |
+        sed 's|^app/v||;s|^v||'
+}
 # 获取本地版本（超强兼容）
 get_local_version() {
     if [ -x "/usr/local/bin/hysteria" ]; then
@@ -132,19 +170,35 @@ download_hysteria() {
 }
 # ======================== 🔄 版本控制 ========================
 check_and_update_version() {
-    local remote=$(get_remote_version) || return 1
+    local remote=$(get_remote_version) || { error "获取远程版本失败"; exit 1; }
     local local=$(get_local_version)
 
     case "$local" in
-        "$remote") success "已是最新版 (v$local)"; return 0 ;;
-        "not_installed") info "开始安装 v$remote"; download_hysteria "$remote" ;;
-        "get_failed") warning "修复安装"; download_hysteria "$remote" ;;
+        "$remote") 
+            success "已是最新版 (v$local)"
+            info "为了避免覆盖相关配置，程序将退出脚本"
+            exit 0
+            ;;
+        "not_installed") 
+            info "开始安装 v$remote"
+            download_hysteria "$remote" 
+            ;;
+        "get_failed") 
+            warning "修复安装"
+            download_hysteria "$remote" 
+            ;;
         *) 
             warning "发现更新 (v$local → v$remote)"
             read -p "是否更新? [Y/n] " choice
             case "${choice:-Y}" in
-                [Yy]*) download_hysteria "$remote" ;;
-                *) info "已取消" ;;
+                [Yy]*) 
+                    download_hysteria "$remote" 
+                    ;;
+                *) 
+                    info "已取消"
+                    info "为了避免覆盖相关配置，程序将退出脚本"
+                    exit 0
+                    ;;
             esac
             ;;
     esac
@@ -329,7 +383,10 @@ main_menu() {
             1) install_hysteria ;;
             2) uninstall_hysteria ;;
             3) info "退出脚本"; exit 0 ;;
-            *) error "无效选项，请重新输入" ;;
+            *) error "无效选项，请输入数字1-3"
+               sleep 1
+               continue
+               ;;
         esac
         read -p "按回车键返回主菜单..."
     done
