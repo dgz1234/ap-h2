@@ -64,20 +64,33 @@ install_dependencies() {
 }
 # ======================== 🔄 版本检查与更新 ========================
 # 获取远程版本（完美处理 app/v 前缀）
-# get_remote_version() {
-#     curl -fsSL https://api.github.com/repos/apernet/hysteria/releases/latest |
-#     grep '"tag_name":' | 
-#     cut -d'"' -f4 |
-#     sed 's|^app/v||;s|^v||'  # 同时处理 app/v 和 v 前缀
-# }
 get_remote_version() {
-    curl -fsSL -I https://github.com/apernet/hysteria/releases/latest |
-    grep -i 'location:' |
-    awk -F'/' '{print $NF}' |
-    tr -d '\r' |
-    sed 's|^app/v||;s|^v||'  # 保留原有的前缀处理
-}
+    local api_url="https://api.github.com/repos/apernet/hysteria/releases/latest"
+    local web_url="https://github.com/apernet/hysteria/releases/latest"
+    local version
 
+    # 尝试API方式（带限速检测）
+    if response=$(curl -fsSL -w "\n%{http_code}" "$api_url" 2>/dev/null); then
+        http_code=$(echo "$response" | tail -n1)
+        if [ "$http_code" = "200" ]; then
+            version=$(echo "$response" | head -n-1 | 
+                     grep '"tag_name":' | 
+                     cut -d'"' -f4 |
+                     sed 's|^app/v||;s|^v||')
+        fi
+    fi
+
+    # 降级逻辑
+    if [ -z "$version" ]; then
+        version=$(curl -fsSL -I "$web_url" 2>/dev/null |
+                grep -i 'location:' |
+                awk -F'/' '{print $NF}' |
+                tr -d '\r' |
+                sed 's|^app/v||;s|^v||')
+    fi
+
+    [ -n "$version" ] && echo "$version" || return 1
+}
 # 获取本地版本（超强兼容）
 get_local_version() {
     if [ -x "/usr/local/bin/hysteria" ]; then
