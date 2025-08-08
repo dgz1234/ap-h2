@@ -64,31 +64,49 @@ install_dependencies() {
 }
 # ======================== 🔄 版本检查与更新 ========================
 # 获取远程版本（完美处理 app/v 前缀）
+# 版本检查模块 (最终优化版)
 get_remote_version() {
     local version
-    local api_available=1
+    local api_url="https://api.github.com/repos/apernet/hysteria/releases/latest"
+    local web_url="https://github.com/apernet/hysteria/releases/latest"
 
-    # 检查API剩余次数
-    local remaining=$(curl -sSL -I https://api.github.com 2>/dev/null |
-                   grep -i 'x-ratelimit-remaining:' |
-                   awk '{print $2}' | tr -d '\r')
-
-    # 如果剩余次数充足，尝试API
-    if [ -n "$remaining" ] && [ "$remaining" -gt 5 ]; then
-        version=$(curl --connect-timeout 5 -fsSL \
-                 https://api.github.com/repos/apernet/hysteria/releases/latest 2>/dev/null |
-                 grep '"tag_name":' | cut -d'"' -f4 |
-                 sed 's|^app/v||;s|^v||')
+    # 智能API调用 (带限速预检)
+    if should_use_api; then
+        version=$(try_api_fetch "$api_url") || {
+            warning "API访问失败，降级到非API方式 (错误码: $?)"
+            version=$(try_web_fetch "$web_url")
+        }
+    else
+        version=$(try_web_fetch "$web_url")
     fi
 
-    # 降级逻辑
-    if [ -z "$version" ]; then
-        version=$(curl -fsSL -I https://github.com/apernet/hysteria/releases/latest 2>/dev/null |
-                grep -i 'location:' | awk -F'/' '{print $NF}' |
-                tr -d '\r' | sed 's|^app/v||;s|^v||')
-    fi
+    [ -n "$version" ] && echo "$version" || {
+        error "所有版本获取方式均失败"
+        return 1
+    }
+}
 
-    [ -n "$version" ] && echo "$version" || return 1
+should_use_api() {
+    [ -z "$NO_API" ] &&          # 没有明确禁用API
+    [ "$(get_api_remaining)" -gt 5 ]  # 剩余次数>5
+}
+
+try_api_fetch() {
+    curl --connect-timeout 5 -fsSL "$1" | 
+    jq -r '.tag_name | sub("^app/v";"") | sub("^v";"")'
+}
+
+try_web_fetch() {
+    curl -fsSL -I "$1" | 
+    awk -F'/' '/location:/{print $NF}' | 
+    tr -d '\r' |
+    sed 's/^app\/v//;s/^v//'
+}
+
+get_api_remaining() {
+    curl -sI https://api.github.com | 
+    awk '/x-ratelimit-remaining:/{print $2}' | 
+    tr -d '\r'
 }
 # 获取本地版本（超强兼容）
 get_local_version() {
