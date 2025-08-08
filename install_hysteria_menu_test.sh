@@ -36,9 +36,8 @@ get_latest_version() {
     echo "$latest_version"  # 现在只输出数字版本号（如 2.6.2）
     return 0
 }
-echo "最新版本号: $(get_latest_version)"
+echo "远程文件版本号: $(get_latest_version)"
 read -p "按任意键继续..." -n1 -s
-# 以上代码保持原样，无需修改（结束）
 
 check_hysteria_version() {
     local program_path="/usr/local/bin/hysteria"
@@ -46,23 +45,25 @@ check_hysteria_version() {
     
     # 检查程序是否存在
     if [ ! -f "$program_path" ]; then
-        echo "文件不存在: $program_path"
+        echo "本地文件不存在: $program_path"
         return 1
     fi
     
     # 获取当前版本
     local current_version=$("$program_path" version 2>/dev/null)
     if [ -z "$current_version" ]; then
-        warning "获取当前版本失败"
+        warning "获取本地文件版本号失败"
         return 2
     fi
 }
-echo "最新版本号: $(current_version)"
+echo "本地文件版本号: $(current_version)"
 read -p "按任意键继续..." -n1 -s
+
+# 以上代码保持原样，无需修改（结束）
 
 # 安装 hysteria
 install_hysteria() {
-    # get_latest_version
+    get_latest_version
     check_hysteria_version
 }
 
