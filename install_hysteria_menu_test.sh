@@ -20,56 +20,83 @@ warning() { echo -e "${YELLOW}[警告]${NC} $1"; }
 error() { echo -e "${RED}[错误]${NC} $1"; }
 retry() { echo -e "${PURPLE}[重试]${NC} $1"; }
 
-# 获取最新版本号
-get_latest_version() {
-    temp_file=$(mktemp)
-    if ! wget -qO- https://api.github.com/repos/apernet/hysteria/releases/latest > "$temp_file"; then
-        rm -f "$temp_file"
-        return 1
-    fi
-    # 提取版本号并移除 app/v 或 v 前缀
-    latest_version=$(grep '"tag_name":' "$temp_file" | cut -d'"' -f4 | sed -E 's/^(app\/)?v//')
-    rm -f "$temp_file"
-    if [ -z "$latest_version" ]; then
-        return 1
-    fi
-    echo "$latest_version"  # 现在只输出数字版本号（如 2.6.2）
-    return 0
-}
-echo "远程文件版本号: $(get_latest_version)"
-read -p "按任意键继续..." -n1 -s
+# # 获取最新版本号
+# get_latest_version() {
+#     temp_file=$(mktemp)
+#     if ! wget -qO- https://api.github.com/repos/apernet/hysteria/releases/latest > "$temp_file"; then
+#         rm -f "$temp_file"
+#         return 1
+#     fi
+#     # 提取版本号并移除 app/v 或 v 前缀
+#     latest_version=$(grep '"tag_name":' "$temp_file" | cut -d'"' -f4 | sed -E 's/^(app\/)?v//')
+#     rm -f "$temp_file"
+#     if [ -z "$latest_version" ]; then
+#         return 1
+#     fi
+#     echo "$latest_version"  # 现在只输出数字版本号（如 2.6.2）
+#     return 0
+# }
+# echo "远程文件版本号: $(get_latest_version)"
+# read -p "按任意键继续..." -n1 -s
 
-check_hysteria_version() {
-    local program_path="/usr/local/bin/hysteria"
+# check_hysteria_version() {
+#     local program_path="/usr/local/bin/hysteria"
     
-    # 检查程序是否存在
-    if [ ! -f "$program_path" ]; then
-        echo "文件不存在"
-        return 1
-    fi
+#     # 检查程序是否存在
+#     if [ ! -f "$program_path" ]; then
+#         echo "文件不存在"
+#         return 1
+#     fi
     
-    # 获取当前版本并提取纯数字
-    local full_version=$("$program_path" version 2>/dev/null)
-    local current_version=$(echo "$full_version" | grep -Eo 'Version:[[:space:]]+v?[0-9.]+' | grep -Eo '[0-9.]+')
+#     # 获取当前版本并提取纯数字
+#     local full_version=$("$program_path" version 2>/dev/null)
+#     local current_version=$(echo "$full_version" | grep -Eo 'Version:[[:space:]]+v?[0-9.]+' | grep -Eo '[0-9.]+')
     
-    if [ -z "$current_version" ]; then
-        echo "获取失败"
-        return 2
-    fi
+#     if [ -z "$current_version" ]; then
+#         echo "获取失败"
+#         return 2
+#     fi
     
-    # 输出纯数字版本号
-    echo "$current_version"
-    return 0
-}
-echo "本地文件版本号: $(check_hysteria_version)"
-read -p "按任意键继续..." -n1 -s
+#     # 输出纯数字版本号
+#     echo "$current_version"
+#     return 0
+# }
+# echo "本地文件版本号: $(check_hysteria_version)"
+# read -p "按任意键继续..." -n1 -s
 
-# 以上代码保持原样，无需修改（结束）
+# # 以上代码保持原样，无需修改（结束）
+
+# 获取远程版本（完美处理 app/v 前缀）
+get_remote_version() {
+    curl -fsSL https://api.github.com/repos/apernet/hysteria/releases/latest |
+    grep '"tag_name":' | 
+    cut -d'"' -f4 |
+    sed 's|^app/v||;s|^v||'  # 同时处理 app/v 和 v 前缀
+}
+
+# 获取本地版本（超强兼容）
+get_local_version() {
+    if [ -x "/usr/local/bin/hysteria" ]; then
+        /usr/local/bin/hysteria version 2>/dev/null |
+        grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' |
+        head -1 || echo "get_failed"
+    else
+        echo "not_installed"
+    fi
+}
+
+# 执行并打印结果
+echo "最新版本: $(get_remote_version)"
+echo "本地版本: $(get_local_version)"
+read -p "按任意键继续..." -n1 -s
 
 # 安装 hysteria
 install_hysteria() {
-    get_latest_version
-    check_hysteria_version
+    # get_latest_version
+    # check_hysteria_version
+    et_remote_version
+    get_local_version
+
 }
 
 # 主菜单
