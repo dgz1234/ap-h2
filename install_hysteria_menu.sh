@@ -312,12 +312,18 @@ uninstall_hysteria() {
 main_menu() {
     while true; do
         show_header
+        echo
         echo -e "${BLUE}================ 🔄 版本控制 ================${NC}"
+        echo
         echo "最新版本: $(get_remote_version)"
         echo "本地版本: $(get_local_version)"
-        echo echo -e "${GREEN}================ 🖥️ 用户界面 ================${NC}"
+        echo
+        echo -e "${GREEN}================ 🖥️ 用户界面 ================${NC}"
+        echo
         echo -e "${BLUE}1. 安装 hysteria2\n2. 卸载 hysteria2\n3. 退出脚本${NC}"
+        echo
         echo -e "${YELLOW}================ 🚀 脚本入口 ================${NC}"
+        echo
         read -p "请输入选项 [1-3]: " choice
         case "$choice" in
             1) install_hysteria ;;
