@@ -65,28 +65,27 @@ install_dependencies() {
 # ======================== 🔄 版本检查与更新 ========================
 # 获取远程版本（完美处理 app/v 前缀）
 get_remote_version() {
-    local api_url="https://api.github.com/repos/apernet/hysteria/releases/latest"
-    local web_url="https://github.com/apernet/hysteria/releases/latest"
     local version
+    local api_available=1
 
-    # 尝试API方式（带限速检测）
-    if response=$(curl -fsSL -w "\n%{http_code}" "$api_url" 2>/dev/null); then
-        http_code=$(echo "$response" | tail -n1)
-        if [ "$http_code" = "200" ]; then
-            version=$(echo "$response" | head -n-1 | 
-                     grep '"tag_name":' | 
-                     cut -d'"' -f4 |
-                     sed 's|^app/v||;s|^v||')
-        fi
+    # 检查API剩余次数
+    local remaining=$(curl -sSL -I https://api.github.com 2>/dev/null |
+                   grep -i 'x-ratelimit-remaining:' |
+                   awk '{print $2}' | tr -d '\r')
+
+    # 如果剩余次数充足，尝试API
+    if [ -n "$remaining" ] && [ "$remaining" -gt 5 ]; then
+        version=$(curl --connect-timeout 5 -fsSL \
+                 https://api.github.com/repos/apernet/hysteria/releases/latest 2>/dev/null |
+                 grep '"tag_name":' | cut -d'"' -f4 |
+                 sed 's|^app/v||;s|^v||')
     fi
 
     # 降级逻辑
     if [ -z "$version" ]; then
-        version=$(curl -fsSL -I "$web_url" 2>/dev/null |
-                grep -i 'location:' |
-                awk -F'/' '{print $NF}' |
-                tr -d '\r' |
-                sed 's|^app/v||;s|^v||')
+        version=$(curl -fsSL -I https://github.com/apernet/hysteria/releases/latest 2>/dev/null |
+                grep -i 'location:' | awk -F'/' '{print $NF}' |
+                tr -d '\r' | sed 's|^app/v||;s|^v||')
     fi
 
     [ -n "$version" ] && echo "$version" || return 1
@@ -365,7 +364,10 @@ main_menu() {
             1) install_hysteria ;;
             2) uninstall_hysteria ;;
             3) info "退出脚本"; exit 0 ;;
-            *) error "无效选项，请重新输入" ;;
+            *) error "无效选项，请输入数字1-3"
+               sleep 1
+               continue
+               ;;
         esac
         read -p "按回车键返回主菜单..."
     done
