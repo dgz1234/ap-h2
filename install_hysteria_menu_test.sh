@@ -132,19 +132,35 @@ download_hysteria() {
 }
 # ======================== 🔄 版本控制 ========================
 check_and_update_version() {
-    local remote=$(get_remote_version) || return 1
+    local remote=$(get_remote_version) || { error "获取远程版本失败"; exit 1; }
     local local=$(get_local_version)
 
     case "$local" in
-        "$remote") success "已是最新版 (v$local)"; return 0 ;;
-        "not_installed") info "开始安装 v$remote"; download_hysteria "$remote" ;;
-        "get_failed") warning "修复安装"; download_hysteria "$remote" ;;
+        "$remote") 
+            success "已是最新版 (v$local)"
+            info "为了避免覆盖相关配置，程序将退出脚本"
+            exit 0
+            ;;
+        "not_installed") 
+            info "开始安装 v$remote"
+            download_hysteria "$remote" 
+            ;;
+        "get_failed") 
+            warning "修复安装"
+            download_hysteria "$remote" 
+            ;;
         *) 
             warning "发现更新 (v$local → v$remote)"
             read -p "是否更新? [Y/n] " choice
             case "${choice:-Y}" in
-                [Yy]*) download_hysteria "$remote" ;;
-                *) info "已取消" ;;
+                [Yy]*) 
+                    download_hysteria "$remote" 
+                    ;;
+                *) 
+                    info "已取消"
+                    info "为了避免覆盖相关配置，程序将退出脚本"
+                    exit 0
+                    ;;
             esac
             ;;
     esac
