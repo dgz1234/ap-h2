@@ -34,7 +34,8 @@ get_latest_version() {
     echo "$latest_version"
     return 0
 }
-
+echo "最新版本号: $(get_latest_version)"
+read -p "按任意键继续..." -n1 -s
 # 版本比对函数
 compare_versions() {
     local current_ver=$1
