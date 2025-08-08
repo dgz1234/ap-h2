@@ -64,11 +64,18 @@ install_dependencies() {
 }
 # ======================== 🔄 版本检查与更新 ========================
 # 获取远程版本（完美处理 app/v 前缀）
+# get_remote_version() {
+#     curl -fsSL https://api.github.com/repos/apernet/hysteria/releases/latest |
+#     grep '"tag_name":' | 
+#     cut -d'"' -f4 |
+#     sed 's|^app/v||;s|^v||'  # 同时处理 app/v 和 v 前缀
+# }
 get_remote_version() {
-    curl -fsSL https://api.github.com/repos/apernet/hysteria/releases/latest |
-    grep '"tag_name":' | 
-    cut -d'"' -f4 |
-    sed 's|^app/v||;s|^v||'  # 同时处理 app/v 和 v 前缀
+    curl -fsSL -I https://github.com/apernet/hysteria/releases/latest |
+    grep -i 'location:' |
+    awk -F'/' '{print $NF}' |
+    tr -d '\r' |
+    sed 's|^app/v||;s|^v||'  # 保留原有的前缀处理
 }
 
 # 获取本地版本（超强兼容）
