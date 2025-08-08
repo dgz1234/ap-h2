@@ -44,22 +44,23 @@ check_hysteria_version() {
     
     # 检查程序是否存在
     if [ ! -f "$program_path" ]; then
-        echo "本地文件不存在: $program_path" >&2  # 错误信息输出到stderr
+        echo "文件不存在"
         return 1
     fi
     
-    # 获取当前版本
-    local current_version=$("$program_path" version 2>/dev/null)
+    # 获取当前版本并提取纯数字
+    local full_version=$("$program_path" version 2>/dev/null)
+    local current_version=$(echo "$full_version" | grep -Eo 'Version:[[:space:]]+v?[0-9.]+' | grep -Eo '[0-9.]+')
+    
     if [ -z "$current_version" ]; then
-        echo "获取本地文件版本号失败" >&2  # 错误信息输出到stderr
+        echo "获取失败"
         return 2
     fi
     
-    # 输出纯净版本号（供命令替换捕获）
+    # 输出纯数字版本号
     echo "$current_version"
     return 0
 }
-
 echo "本地文件版本号: $(check_hysteria_version)"
 read -p "按任意键继续..." -n1 -s
 
