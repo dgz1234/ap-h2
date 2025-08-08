@@ -67,46 +67,47 @@ install_dependencies() {
 # 版本检查模块 (最终优化版)
 get_remote_version() {
     local version
-    local api_url="https://api.github.com/repos/apernet/hysteria/releases/latest"
-    local web_url="https://github.com/apernet/hysteria/releases/latest"
-
-    # 智能API调用 (带限速预检)
-    if should_use_api; then
-        version=$(try_api_fetch "$api_url") || {
-            warning "API访问失败，降级到非API方式 (错误码: $?)"
-            version=$(try_web_fetch "$web_url")
-        }
+    local max_retries=2
+    local retry_delay=1
+    
+    # 尝试API方式 (带重试机制)
+    for ((i=1; i<=$max_retries; i++)); do
+        version=$(_fetch_via_api)
+        if [ $? -eq 0 ] && [ -n "$version" ]; then
+            echo "$version"
+            return 0
+        else
+            warning "[尝试 $i/$max_retries] API获取失败，等待 ${retry_delay}秒后重试..."
+            sleep $retry_delay
+        fi
+    done
+    
+    # 降级到非API方式
+    warning "正在使用备用方式获取版本..."
+    version=$(_fetch_via_web)
+    
+    if [ -n "$version" ]; then
+        echo "$version"
     else
-        version=$(try_web_fetch "$web_url")
-    fi
-
-    [ -n "$version" ] && echo "$version" || {
-        error "所有版本获取方式均失败"
+        error "错误：所有版本获取方式均失败"
         return 1
-    }
+    fi
 }
 
-should_use_api() {
-    [ -z "$NO_API" ] &&          # 没有明确禁用API
-    [ "$(get_api_remaining)" -gt 5 ]  # 剩余次数>5
+_fetch_via_api() {
+    curl --connect-timeout 5 -fsSL \
+        https://api.github.com/repos/apernet/hysteria/releases/latest 2>/dev/null |
+        grep -o '"tag_name": *"[^"]*"' |
+        cut -d'"' -f4 |
+        sed 's|^app/v||;s|^v||'
 }
 
-try_api_fetch() {
-    curl --connect-timeout 5 -fsSL "$1" | 
-    jq -r '.tag_name | sub("^app/v";"") | sub("^v";"")'
-}
-
-try_web_fetch() {
-    curl -fsSL -I "$1" | 
-    awk -F'/' '/location:/{print $NF}' | 
-    tr -d '\r' |
-    sed 's/^app\/v//;s/^v//'
-}
-
-get_api_remaining() {
-    curl -sI https://api.github.com | 
-    awk '/x-ratelimit-remaining:/{print $2}' | 
-    tr -d '\r'
+_fetch_via_web() {
+    curl -fsSL -I \
+        https://github.com/apernet/hysteria/releases/latest 2>/dev/null |
+        tr -d '\r' |
+        awk -F'/' '/location:/{print $NF}' |
+        sed 's|^app/v||;s|^v||'
 }
 # 获取本地版本（超强兼容）
 get_local_version() {
