@@ -1,3 +1,4 @@
+# 以下代码保持原样，无需修改（开始）
 #!/bin/ash
 # 脚本名称：hysteria_installer.sh
 # 描述：Alpine Linux Hysteria2 安装工具
@@ -37,62 +38,32 @@ get_latest_version() {
 }
 echo "最新版本号: $(get_latest_version)"
 read -p "按任意键继续..." -n1 -s
-# 版本比对函数
-compare_versions() {
-    local current_ver=$1
-    local latest_ver=$2
-    
-    # 提取纯净版本号 (如从 "v2.6.2" 或 "app/v2.6.2" 中提取 "2.6.2")
-    current_clean=$(echo "$current_ver" | head -n 1 | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+')
-    latest_clean=$(echo "$latest_ver" | sed 's/^app\/v//;s/^v//')
-    
-    if [ -z "$current_clean" ] || [ -z "$latest_clean" ]; then
-        return 2  # 版本获取失败
-    fi
-    
-    if [ "$current_clean" = "$latest_clean" ]; then
-        return 0  # 版本匹配
-    else
-        return 1  # 版本不匹配
-    fi
-}
-echo "测试结果: $(get_latest_version)"
-# 安装 hysteria
-install_hysteria() {
+# 以上代码保持原样，无需修改（结束）
 
-    latest_version=$(get_latest_version)
-    if [ -z "$latest_version" ]; then
-        error "无法获取最新版本"
+check_hysteria_version() {
+    local program_path="/usr/local/bin/hysteria"
+    local latest_version=$1  # 接收传入的最新版本号
+    
+    # 检查程序是否存在
+    if [ ! -f "$program_path" ]; then
+        echo "文件不存在: $program_path"
         return 1
     fi
-    success "最新版本: $latest_version"
-
-    if [ -f "/usr/local/bin/hysteria" ]; then
-        current_version=$(/usr/local/bin/hysteria version 2>/dev/null)
-        
-        compare_versions "$current_version" "$latest_version"
-        case $? in
-            0)
-                success "当前已安装最新版本 ($latest_version)，跳过下载"
-                ;;
-            1)
-                current_clean=$(echo "$current_version" | head -n 1 | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+')
-                latest_clean=$(echo "$latest_version" | sed 's/^app\/v//;s/^v//')
-                warning "发现旧版本 ($current_clean)，最新版本为 ($latest_clean)"
-                read -p "是否更新到最新版本? [y/N] " update_choice
-                if [[ "$update_choice" =~ ^[Yy]$ ]]; then
-                    rm -f /usr/local/bin/hysteria
-                else
-                    info "跳过更新"
-                    return 0
-                fi
-                ;;
-            2)
-                warning "版本比对失败，强制更新"
-                rm -f /usr/local/bin/hysteria
-                ;;
-        esac
+    
+    # 获取当前版本
+    local current_version=$("$program_path" version 2>/dev/null)
+    if [ -z "$current_version" ]; then
+        warning "获取当前版本失败"
+        return 2
     fi
+}
+echo "最新版本号: $(current_version)"
+read -p "按任意键继续..." -n1 -s
+
+# 安装 hysteria
+install_hysteria() {
+    # get_latest_version
+    check_hysteria_version
 }
 
 # 主菜单
