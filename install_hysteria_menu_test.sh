@@ -136,7 +136,6 @@ install_hysteria() {
 # 主菜单
 main_menu() {
     while true; do
-        show_header
         echo -e "${BLUE}1. 安装 hysteria2\n2. 卸载 hysteria2\n3. 退出脚本${NC}"
         echo "===================================="
         read -p "请输入选项 [1-3]: " choice
