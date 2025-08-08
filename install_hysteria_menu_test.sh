@@ -26,12 +26,13 @@ get_latest_version() {
         rm -f "$temp_file"
         return 1
     fi
-    latest_version=$(grep '"tag_name":' "$temp_file" | cut -d'"' -f4)
+    # 提取版本号并移除 app/v 或 v 前缀
+    latest_version=$(grep '"tag_name":' "$temp_file" | cut -d'"' -f4 | sed -E 's/^(app\/)?v//')
     rm -f "$temp_file"
     if [ -z "$latest_version" ]; then
         return 1
     fi
-    echo "$latest_version"
+    echo "$latest_version"  # 现在只输出数字版本号（如 2.6.2）
     return 0
 }
 echo "最新版本号: $(get_latest_version)"
