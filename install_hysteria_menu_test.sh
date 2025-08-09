@@ -232,7 +232,65 @@ check_and_update_version() {
 version_gt() {
     test "$(printf '%s\n' "$@" | sort -V | head -n 1)" != "$1"
 }
-# 以上代码保持原样，无需修改（结束）
+# 生成自签名证书
+generate_self_signed_cert() {
+    info "正在生成自签名证书..."
+    openssl ecparam -genkey -name prime256v1 -out /etc/hysteria/server.key
+    openssl req -new -x509 -days 36500 -key /etc/hysteria/server.key -out /etc/hysteria/server.crt -subj "/CN=www.bing.com"
+    chown hysteria:hysteria /etc/hysteria/server.key /etc/hysteria/server.crt
+    chmod 600 /etc/hysteria/server.key
+    success "自签名证书已生成"
+}
+
+# 生成配置文件
+generate_config_file() {
+    local port=$1
+    local password=$2
+    
+    info "正在生成配置文件..."
+    cat > /etc/hysteria/config.yaml <<EOF
+listen: :${port}
+tls:
+  cert: /etc/hysteria/server.crt
+  key: /etc/hysteria/server.key
+auth:
+  type: password
+  password: ${password}
+masquerade:
+  type: proxy
+  proxy:
+    url: https://bing.com/
+    rewriteHost: true
+EOF
+    chown hysteria:hysteria /etc/hysteria/config.yaml
+    success "配置文件已生成"
+}
+
+# 配置系统服务
+configure_system_service() {
+    info "正在配置系统服务..."
+    cat > /etc/init.d/hysteria <<EOF
+#!/sbin/openrc-run
+name="hysteria"
+command="/usr/local/bin/hysteria"
+command_args="server --config /etc/hysteria/config.yaml"
+command_user="hysteria"
+pidfile="/var/run/\${name}.pid"
+command_background="yes"
+
+depend() {
+    need net
+    after firewall
+}
+EOF
+    chmod +x /etc/init.d/hysteria
+    rc-update add hysteria >/dev/null 2>&1
+    /etc/init.d/hysteria start >/dev/null || {
+        error "服务启动失败"
+        return 1
+    }
+    success "系统服务已配置"
+}
 
 # 安装 hysteria
 install_hysteria() {
@@ -262,65 +320,26 @@ install_hysteria() {
         info "专用用户 hysteria 已存在"
     fi
     mkdir -p /etc/hysteria
+    
+    # 生成证书
     if [ ! -f "/etc/hysteria/server.key" ] || [ ! -f "/etc/hysteria/server.crt" ]; then
-        info "正在生成自签名证书..."
-        openssl ecparam -genkey -name prime256v1 -out /etc/hysteria/server.key
-        openssl req -new -x509 -days 36500 -key /etc/hysteria/server.key -out /etc/hysteria/server.crt -subj "/CN=www.bing.com"
-        chown hysteria:hysteria /etc/hysteria/server.key /etc/hysteria/server.crt
-        chmod 600 /etc/hysteria/server.key
-        success "自签名证书已生成"
+        generate_self_signed_cert
     else
         info "检测到现有TLS证书，跳过生成"
     fi
 
+    # 生成配置文件
     if [ ! -f "/etc/hysteria/config.yaml" ]; then
-        info "正在生成配置文件..."
-        cat > /etc/hysteria/config.yaml <<EOF
-listen: :${port}
-tls:
-  cert: /etc/hysteria/server.crt
-  key: /etc/hysteria/server.key
-auth:
-  type: password
-  password: ${password}
-masquerade:
-  type: proxy
-  proxy:
-    url: https://bing.com/
-    rewriteHost: true
-EOF
-        chown hysteria:hysteria /etc/hysteria/config.yaml
-        success "配置文件已生成"
+        generate_config_file "$port" "$password"
     else
         info "检测到现有配置文件，跳过生成"
     fi
 
-    info "正在配置系统服务..."
-    cat > /etc/init.d/hysteria <<EOF
-#!/sbin/openrc-run
-name="hysteria"
-command="/usr/local/bin/hysteria"
-command_args="server --config /etc/hysteria/config.yaml"
-command_user="hysteria"
-pidfile="/var/run/\${name}.pid"
-command_background="yes"
-
-depend() {
-    need net
-    after firewall
-}
-EOF
-    chmod +x /etc/init.d/hysteria
-    rc-update add hysteria >/dev/null 2>&1
-    /etc/init.d/hysteria start >/dev/null || {
-        error "服务启动失败"
-        return 1
-    }
-    success "系统服务已配置"
+    # 配置系统服务
+    configure_system_service
 
     show_installation_result "$port" "$password"
 }
-
 # 显示安装结果
 show_installation_result() {
     local port=$1
@@ -422,3 +441,5 @@ main_menu() {
 }
 # ======================== 🚀 脚本入口 ========================
 main_menu
+
+
