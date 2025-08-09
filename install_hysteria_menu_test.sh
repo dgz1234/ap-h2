@@ -169,38 +169,68 @@ download_hysteria() {
 }
 # ======================== 🔄 版本控制 ========================
 check_and_update_version() {
-    local remote=$(get_remote_version) || { error "获取远程版本失败"; exit 1; }
-    local local=$(get_local_version)
+    # 获取远程版本（带严格错误检查）
+    local remote
+    remote=$(get_remote_version 2>/dev/null)
+    local ret=$?
+    
+    if [ $ret -ne 0 ] || [ -z "$remote" ]; then
+        error "无法获取远程版本号 (错误码: $ret)"
+        error "请检查网络连接或GitHub访问状态"
+        exit 1
+    fi
 
+    # 获取本地版本
+    local local
+    local=$(get_local_version)
+    
+    # 版本比较逻辑
     case "$local" in
-        "$remote") 
+        "$remote")
             success "已是最新版 (v$local)"
-            info "为了避免覆盖相关配置，程序将退出脚本"
             exit 0
             ;;
-        "not_installed") 
-            info "开始安装 v$remote"
-            download_hysteria "$remote" 
+        "not_installed")
+            info "开始全新安装 v$remote"
+            if ! download_hysteria "$remote"; then
+                error "安装失败"
+                exit 1
+            fi
             ;;
-        "get_failed") 
-            warning "修复安装"
-            download_hysteria "$remote" 
+        "get_failed")
+            warning "尝试修复安装 (当前版本获取失败)"
+            if ! download_hysteria "$remote"; then
+                error "修复安装失败"
+                exit 1
+            fi
             ;;
-        *) 
-            warning "发现更新 (v$local → v$remote)"
-            read -p "是否更新? [Y/n] " choice
-            case "${choice:-Y}" in
-                [Yy]*) 
-                    download_hysteria "$remote" 
-                    ;;
-                *) 
-                    info "已取消"
-                    info "为了避免覆盖相关配置，程序将退出脚本"
-                    exit 0
-                    ;;
-            esac
+        *)
+            if version_gt "$remote" "$local"; then
+                warning "发现更新 (v$local → v$remote)"
+                read -p "是否更新? [Y/n] " choice
+                case "${choice:-Y}" in
+                    [Yy]*) 
+                        if ! download_hysteria "$remote"; then
+                            error "更新失败"
+                            exit 1
+                        fi
+                        ;;
+                    *)
+                        info "已取消更新"
+                        exit 0
+                        ;;
+                esac
+            else
+                warning "本地版本 (v$local) 比远程版本 (v$remote) 更新"
+                warning "可能是开发版或自定义构建，跳过更新"
+                exit 0
+            fi
             ;;
     esac
+}
+# 版本比较函数
+version_gt() {
+    test "$(printf '%s\n' "$@" | sort -V | head -n 1)" != "$1"
 }
 # 以上代码保持原样，无需修改（结束）
 
