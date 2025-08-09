@@ -1,7 +1,7 @@
 #!/bin/ash
 # 脚本名称：hysteria_installer.sh
 # 描述：Alpine Linux Hysteria2 安装工具
-# 适用机器类型：Alpine Linux-LXC容器-IPv6-only-无NAT64网关-wireguard内核支持-客户端root-60G内存-90M磁盘
+# 适用机器类型：Alpine Linux-LXC容器-IPv6-only-无NAT64网关-wireguard内核支持-客户端root-64M内存-90M磁盘
 # 作者：dgz1234
 # ======================== 📦 常量定义 ========================
 # ==================== 颜色定义 ====================
@@ -261,8 +261,8 @@ auth:
   type: password
   password: ${password}
 bandwidth:
-  up: 300 mbps
-  down: 40 mbps
+  up: 400 mbps
+  down: 60 mbps
 masquerade:
   type: proxy
   proxy:
