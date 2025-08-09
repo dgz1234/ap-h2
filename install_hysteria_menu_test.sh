@@ -260,6 +260,9 @@ tls:
 auth:
   type: password
   password: ${password}
+bandwidth:
+  up: 300 mbps
+  down: 40 mbps
 masquerade:
   type: proxy
   proxy:
