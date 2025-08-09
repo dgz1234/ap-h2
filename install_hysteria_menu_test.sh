@@ -108,6 +108,7 @@ _fetch_via_web() {
         awk -F'/' '/location:/{print $NF}' |
         sed 's|^app/v||;s|^v||'
 }
+
 # 获取本地版本（超强兼容）
 get_local_version() {
     if [ -x "/usr/local/bin/hysteria" ]; then
@@ -167,6 +168,7 @@ download_hysteria() {
         return 1
     fi
 }
+
 # ======================== 🔄 版本控制 ========================
 check_and_update_version() {
     # 获取远程版本（带严格错误检查）
@@ -228,10 +230,12 @@ check_and_update_version() {
             ;;
     esac
 }
+
 # 版本比较函数
 version_gt() {
     test "$(printf '%s\n' "$@" | sort -V | head -n 1)" != "$1"
 }
+
 # 生成自签名证书
 generate_self_signed_cert() {
     info "正在生成自签名证书..."
@@ -302,7 +306,6 @@ install_hysteria() {
     install_dependencies || return 1
     read -p "请输入监听端口 (默认: 36711): " port
     port=${port:-36711}
-
     read -p "请输入密码 (留空将自动生成): " password
     if [ -z "$password" ]; then
         password=$(tr -dc 'A-Za-z0-9,_-' < /dev/urandom | head -c 24)
@@ -320,7 +323,6 @@ install_hysteria() {
         info "专用用户 hysteria 已存在"
     fi
     mkdir -p /etc/hysteria
-    
     # 生成证书
     if [ ! -f "/etc/hysteria/server.key" ] || [ ! -f "/etc/hysteria/server.crt" ]; then
         generate_self_signed_cert
@@ -340,6 +342,7 @@ install_hysteria() {
 
     show_installation_result "$port" "$password"
 }
+
 # 显示安装结果
 show_installation_result() {
     local port=$1
@@ -401,6 +404,7 @@ show_installation_result() {
     echo "重启: /etc/init.d/hysteria restart"
     echo "状态: /etc/init.d/hysteria status"
 }
+
 # 卸载 hysteria
 uninstall_hysteria() {
     info "正在卸载 Hysteria..."
@@ -410,6 +414,7 @@ uninstall_hysteria() {
     id hysteria >/dev/null 2>&1 && deluser hysteria && success "用户已删除"
     success "Hysteria 已卸载"
 }
+
 # ======================== 🖥️ 用户界面 ========================
 main_menu() {
     while true; do
@@ -439,7 +444,6 @@ main_menu() {
         read -p "按回车键返回主菜单..."
     done
 }
+
 # ======================== 🚀 脚本入口 ========================
 main_menu
-
-

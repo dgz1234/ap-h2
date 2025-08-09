@@ -108,6 +108,7 @@ _fetch_via_web() {
         awk -F'/' '/location:/{print $NF}' |
         sed 's|^app/v||;s|^v||'
 }
+
 # 获取本地版本（超强兼容）
 get_local_version() {
     if [ -x "/usr/local/bin/hysteria" ]; then
@@ -167,85 +168,91 @@ download_hysteria() {
         return 1
     fi
 }
+
 # ======================== 🔄 版本控制 ========================
 check_and_update_version() {
-    local remote=$(get_remote_version) || { error "获取远程版本失败"; exit 1; }
-    local local=$(get_local_version)
+    # 获取远程版本（带严格错误检查）
+    local remote
+    remote=$(get_remote_version 2>/dev/null)
+    local ret=$?
+    
+    if [ $ret -ne 0 ] || [ -z "$remote" ]; then
+        error "无法获取远程版本号 (错误码: $ret)"
+        error "请检查网络连接或GitHub访问状态"
+        exit 1
+    fi
 
+    # 获取本地版本
+    local local
+    local=$(get_local_version)
+    
+    # 版本比较逻辑
     case "$local" in
-        "$remote") 
+        "$remote")
             success "已是最新版 (v$local)"
-            info "为了避免覆盖相关配置，程序将退出脚本"
             exit 0
             ;;
-        "not_installed") 
-            info "开始安装 v$remote"
-            download_hysteria "$remote" 
+        "not_installed")
+            info "开始全新安装 v$remote"
+            if ! download_hysteria "$remote"; then
+                error "安装失败"
+                exit 1
+            fi
             ;;
-        "get_failed") 
-            warning "修复安装"
-            download_hysteria "$remote" 
+        "get_failed")
+            warning "尝试修复安装 (当前版本获取失败)"
+            if ! download_hysteria "$remote"; then
+                error "修复安装失败"
+                exit 1
+            fi
             ;;
-        *) 
-            warning "发现更新 (v$local → v$remote)"
-            read -p "是否更新? [Y/n] " choice
-            case "${choice:-Y}" in
-                [Yy]*) 
-                    download_hysteria "$remote" 
-                    ;;
-                *) 
-                    info "已取消"
-                    info "为了避免覆盖相关配置，程序将退出脚本"
-                    exit 0
-                    ;;
-            esac
+        *)
+            if version_gt "$remote" "$local"; then
+                warning "发现更新 (v$local → v$remote)"
+                read -p "是否更新? [Y/n] " choice
+                case "${choice:-Y}" in
+                    [Yy]*) 
+                        if ! download_hysteria "$remote"; then
+                            error "更新失败"
+                            exit 1
+                        fi
+                        ;;
+                    *)
+                        info "已取消更新"
+                        exit 0
+                        ;;
+                esac
+            else
+                warning "本地版本 (v$local) 比远程版本 (v$remote) 更新"
+                warning "可能是开发版或自定义构建，跳过更新"
+                exit 0
+            fi
             ;;
     esac
 }
-# 以上代码保持原样，无需修改（结束）
 
-# 安装 hysteria
-install_hysteria() {
-    # 1.检查IPv4支持
-    check_ipv4 || return 1
-    # 2.版本控制
-    check_and_update_version || return 1
-    # 3.安装依赖
-    install_dependencies || return 1
-    read -p "请输入监听端口 (默认: 36711): " port
-    port=${port:-36711}
+# 版本比较函数
+version_gt() {
+    test "$(printf '%s\n' "$@" | sort -V | head -n 1)" != "$1"
+}
 
-    read -p "请输入密码 (留空将自动生成): " password
-    if [ -z "$password" ]; then
-        password=$(tr -dc 'A-Za-z0-9,_-' < /dev/urandom | head -c 24)
-        info "已生成随机密码: ${password}"
-    fi
+# 生成自签名证书
+generate_self_signed_cert() {
+    info "正在生成自签名证书..."
+    openssl ecparam -genkey -name prime256v1 -out /etc/hysteria/server.key
+    openssl req -new -x509 -days 36500 -key /etc/hysteria/server.key -out /etc/hysteria/server.crt -subj "/CN=www.bing.com"
+    chown hysteria:hysteria /etc/hysteria/server.key /etc/hysteria/server.crt
+    chmod 600 /etc/hysteria/server.key
+    success "自签名证书已生成"
+}
 
-    if ! id "hysteria" >/dev/null 2>&1; then
-        info "正在创建专用用户 hysteria..."
-        adduser -D -H -s /sbin/nologin hysteria || {
-            error "创建用户失败"
-            return 1
-        }
-        success "专用用户 hysteria 创建成功"
-    else
-        info "专用用户 hysteria 已存在"
-    fi
-    mkdir -p /etc/hysteria
-    if [ ! -f "/etc/hysteria/server.key" ] || [ ! -f "/etc/hysteria/server.crt" ]; then
-        info "正在生成自签名证书..."
-        openssl ecparam -genkey -name prime256v1 -out /etc/hysteria/server.key
-        openssl req -new -x509 -days 36500 -key /etc/hysteria/server.key -out /etc/hysteria/server.crt -subj "/CN=www.bing.com"
-        chown hysteria:hysteria /etc/hysteria/server.key /etc/hysteria/server.crt
-        chmod 600 /etc/hysteria/server.key
-        success "自签名证书已生成"
-    else
-        info "检测到现有TLS证书，跳过生成"
-    fi
-
-    if [ ! -f "/etc/hysteria/config.yaml" ]; then
-        info "正在生成配置文件..."
-        cat > /etc/hysteria/config.yaml <<EOF
+# 生成配置文件
+generate_config_file() {
+    local port=$1
+    local password=$2
+    
+    info "正在生成配置文件..."
+    cat > /etc/hysteria/config.yaml <<EOF
 listen: :${port}
 tls:
   cert: /etc/hysteria/server.crt
@@ -259,12 +266,12 @@ masquerade:
     url: https://bing.com/
     rewriteHost: true
 EOF
-        chown hysteria:hysteria /etc/hysteria/config.yaml
-        success "配置文件已生成"
-    else
-        info "检测到现有配置文件，跳过生成"
-    fi
+    chown hysteria:hysteria /etc/hysteria/config.yaml
+    success "配置文件已生成"
+}
 
+# 配置系统服务
+configure_system_service() {
     info "正在配置系统服务..."
     cat > /etc/init.d/hysteria <<EOF
 #!/sbin/openrc-run
@@ -287,6 +294,51 @@ EOF
         return 1
     }
     success "系统服务已配置"
+}
+
+# 安装 hysteria
+install_hysteria() {
+    # 1.检查IPv4支持
+    check_ipv4 || return 1
+    # 2.版本控制
+    check_and_update_version || return 1
+    # 3.安装依赖
+    install_dependencies || return 1
+    read -p "请输入监听端口 (默认: 36711): " port
+    port=${port:-36711}
+    read -p "请输入密码 (留空将自动生成): " password
+    if [ -z "$password" ]; then
+        password=$(tr -dc 'A-Za-z0-9,_-' < /dev/urandom | head -c 24)
+        info "已生成随机密码: ${password}"
+    fi
+
+    if ! id "hysteria" >/dev/null 2>&1; then
+        info "正在创建专用用户 hysteria..."
+        adduser -D -H -s /sbin/nologin hysteria || {
+            error "创建用户失败"
+            return 1
+        }
+        success "专用用户 hysteria 创建成功"
+    else
+        info "专用用户 hysteria 已存在"
+    fi
+    mkdir -p /etc/hysteria
+    # 生成证书
+    if [ ! -f "/etc/hysteria/server.key" ] || [ ! -f "/etc/hysteria/server.crt" ]; then
+        generate_self_signed_cert
+    else
+        info "检测到现有TLS证书，跳过生成"
+    fi
+
+    # 生成配置文件
+    if [ ! -f "/etc/hysteria/config.yaml" ]; then
+        generate_config_file "$port" "$password"
+    else
+        info "检测到现有配置文件，跳过生成"
+    fi
+
+    # 配置系统服务
+    configure_system_service
 
     show_installation_result "$port" "$password"
 }
@@ -352,6 +404,7 @@ show_installation_result() {
     echo "重启: /etc/init.d/hysteria restart"
     echo "状态: /etc/init.d/hysteria status"
 }
+
 # 卸载 hysteria
 uninstall_hysteria() {
     info "正在卸载 Hysteria..."
@@ -361,6 +414,7 @@ uninstall_hysteria() {
     id hysteria >/dev/null 2>&1 && deluser hysteria && success "用户已删除"
     success "Hysteria 已卸载"
 }
+
 # ======================== 🖥️ 用户界面 ========================
 main_menu() {
     while true; do
@@ -390,5 +444,6 @@ main_menu() {
         read -p "按回车键返回主菜单..."
     done
 }
+
 # ======================== 🚀 脚本入口 ========================
 main_menu
