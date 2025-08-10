@@ -252,14 +252,22 @@ generate_config_file() {
     local password=$2
     
     # 获取上行带宽设置
-    warning "带宽参数非常重要，直接影响Hysteria2的速率和稳定性，请真实输入！"
-    info "中国移动300兆家庭带宽的参考设置：上行345mbps，下行46mbps"
+    echo -e "${YELLOW}[警告]${NC} 带宽参数非常重要，直接影响Hysteria2的速率和稳定性，请真实输入！"
+    echo -e "${BLUE}[信息]${NC} 中国移动300兆家庭带宽的参考设置：上行345mbps，下行46mbps"
     
-    read -p "$(echo -e "${YELLOW}[输入]${NC} 请输入上行带宽 (默认: 345 mbps): ")" up_bandwidth
-    up_bandwidth=${up_bandwidth:-"345 mbps"}
-    
-    read -p "$(echo -e "${YELLOW}[输入]${NC} 请输入下行带宽 (默认: 46 mbps): ")" down_bandwidth
-    down_bandwidth=${down_bandwidth:-"46 mbps"}
+    while true; do
+        echo -ne "${YELLOW}[输入]${NC} 请输入上行带宽 (默认: 345 mbps): "
+        read -r up_bandwidth
+        up_bandwidth=${up_bandwidth:-"345 mbps"}
+        
+        echo -ne "${YELLOW}[输入]${NC} 请输入下行带宽 (默认: 46 mbps): "
+        read -r down_bandwidth
+        down_bandwidth=${down_bandwidth:-"46 mbps"}
+        
+        echo -e "${BLUE}[确认]${NC} 您设置的带宽为: 上行 ${GREEN}$up_bandwidth${NC}, 下行 ${GREEN}$down_bandwidth${NC}"
+        read -p "是否确认？(y/N) " confirm
+        [[ $confirm =~ [yY] ]] && break
+    done
     
     info "正在生成配置文件..."
     cat > /etc/hysteria/config.yaml <<EOF
