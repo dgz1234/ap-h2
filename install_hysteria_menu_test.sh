@@ -30,7 +30,7 @@ show_help() {
     echo -e "适用环境: Alpine Linux LXC (IPv6-only)"
     echo
     echo -e "${BLUE}用法:${NC}"
-    echo -e "  $0 [选项]"
+    echo -e "  install_hysteria.sh [选项]"
     echo
     echo -e "${YELLOW}选项:${NC}"
     echo -e "  ${GREEN}-h, --help${NC}     显示此帮助信息"
@@ -39,12 +39,14 @@ show_help() {
     echo -e "  ${GREEN}uninstall${NC}      卸载Hysteria2"
     echo
     echo -e "${PURPLE}示例:${NC}"
-    echo -e "  $0 install"
-    echo -e "  $0 --help"
+    echo -e "  install_hysteria.sh install"
+    echo -e "  install_hysteria.sh --help"
     echo
     echo -e "${RED}注意:${NC}"
     echo -e "  1. 需要root权限执行"
-    echo -e "  2. 完整文档: ${DOC_URL}"
+    echo -e "  2. 推荐使用以下方式安装："
+    echo -e "     curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/main/install_hysteria.sh | bash"
+    echo -e "  3. 完整文档: ${DOC_URL}"
     exit 0
 }
 
