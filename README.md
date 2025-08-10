@@ -2,6 +2,8 @@
 
 ## 🌟 核心特性
 
+这是Hysteria真正玩法，不是那些装模作样的玩法.......
+
 通过安装
 ```
 bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/main/install-warp.sh)
