@@ -4,6 +4,10 @@
 # 适用机器类型：Alpine Linux-LXC容器-IPv6-only-无NAT64网关-wireguard内核支持-客户端root-64M内存-90M磁盘
 # 作者：dgz1234
 # ======================== 📦 常量定义 ========================
+SCRIPT_NAME="hysteria_installer.sh"
+SCRIPT_VERSION="1.1.0"
+DOC_URL="https://v2.hysteria.network/zh/docs/getting-started/Installation/"
+ACTION=""
 # ==================== 颜色定义 ====================
 BLUE='\033[1;34m'     # 亮蓝 - 信息
 GREEN='\033[1;32m'    # 亮绿 - 成功
@@ -19,6 +23,48 @@ warning() { echo -e "${YELLOW}[警告]${NC} $1"; }                # 非致命警
 error()   { echo -e "${RED}[错误]${NC} $1" >&2; }               # 致命错误（输出到stderr）
 retry()   { echo -e "${PURPLE}[重试]${NC} $1"; }                # 重试提示
 confirm() { echo -e "${BLUE}[确认]${NC} $1 [y/N]: "; }          # 确认提示（新增）
+
+# ==================== 帮助文档函数 ====================
+show_help() {
+    echo -e "${GREEN}Hysteria2 安装工具 v${SCRIPT_VERSION}${NC}"
+    echo -e "适用环境: Alpine Linux LXC (IPv6-only)"
+    echo
+    echo -e "${BLUE}用法:${NC}"
+    echo -e "  $0 [选项]"
+    echo
+    echo -e "${YELLOW}选项:${NC}"
+    echo -e "  ${GREEN}-h, --help${NC}     显示此帮助信息"
+    echo -e "  ${GREEN}-v, --version${NC}  显示版本信息"
+    echo -e "  ${GREEN}install${NC}        安装Hysteria2 (默认选项)"
+    echo -e "  ${GREEN}uninstall${NC}      卸载Hysteria2"
+    echo
+    echo -e "${PURPLE}示例:${NC}"
+    echo -e "  $0 install"
+    echo -e "  $0 --help"
+    echo
+    echo -e "${RED}注意:${NC}"
+    echo -e "  1. 需要root权限执行"
+    echo -e "  2. 完整文档: ${DOC_URL}"
+    exit 0
+}
+
+# ==================== 参数解析 ====================
+parse_args() {
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -h|--help)      show_help ;;
+            -v|--version)   show_version ;;
+            install)        ACTION=install ;;
+            uninstall)      ACTION=uninstall ;;
+            *)              error "无效参数: $1"; exit 1 ;;
+        esac
+        shift
+    done
+}
+show_version() {
+    echo "hysteria-installer v${SCRIPT_VERSION}"
+    exit 0
+}
 
 # ==================== 显示大标题 ==================== 
 show_header() {
@@ -454,16 +500,60 @@ show_installation_result() {
 
 # 卸载 hysteria
 uninstall_hysteria() {
+    # 非交互模式判断
+    if [ "$1" != "noninteractive" ]; then
+        while true; do
+            read -p "$(confirm "确定要卸载Hysteria吗？")" choice
+            case "$choice" in
+                [yY]*) 
+                    break  # 用户确认卸载
+                    ;;
+                [nN]*) 
+                    info "卸载已取消"
+                    exit 0
+                    ;;
+                *) 
+                    echo -e "${RED}无效输入，请输入 Y/y 或 N/n${NC}"
+                    ;;
+            esac
+        done
+    fi
+
     info "正在卸载 Hysteria..."
-    [ -f /etc/init.d/hysteria ] && /etc/init.d/hysteria stop && rc-update del hysteria && rm -f /etc/init.d/hysteria && success "服务移除"
-    [ -f /usr/local/bin/hysteria ] && rm -f /usr/local/bin/hysteria && success "可执行文件已删除"
-    [ -d /etc/hysteria ] && rm -rf /etc/hysteria && success "配置和证书已删除"
-    id hysteria >/dev/null 2>&1 && deluser hysteria && success "用户已删除"
+    
+    # 服务停止和移除（带错误处理）
+    if [ -f /etc/init.d/hysteria ]; then
+        /etc/init.d/hysteria stop >/dev/null 2>&1
+        rc-update del hysteria >/dev/null 2>&1
+        rm -f /etc/init.d/hysteria && success "服务移除" || error "服务移除失败"
+    fi
+
+    # 可执行文件删除
+    [ -f /usr/local/bin/hysteria ] && \
+        rm -f /usr/local/bin/hysteria && success "可执行文件已删除" || \
+        warning "未找到可执行文件"
+
+    # 配置目录删除
+    if [ -d /etc/hysteria ]; then
+        rm -rf /etc/hysteria && success "配置和证书已删除" || \
+        error "配置删除失败 (权限问题?)"
+    else
+        warning "未找到配置目录"
+    fi
+
+    # 用户删除
+    if id hysteria >/dev/null 2>&1; then
+        deluser hysteria >/dev/null 2>&1 && success "用户已删除" || \
+        error "用户删除失败 (权限问题?)"
+    fi
+
     success "Hysteria 已卸载"
 }
 
 # ======================== 🖥️ 用户界面 ========================
 main_menu() {
+    # 如果已有参数则跳过菜单
+    [ -n "$1" ] && return
     while true; do
         show_header
         echo
@@ -481,7 +571,7 @@ main_menu() {
         read -p "请输入选项 [1-3]: " choice
         case "$choice" in
             1) install_hysteria ;;
-            2) uninstall_hysteria ;;
+            2) uninstall_hysteria "interactive" ;;  # 明确使用交互模式
             3) info "退出脚本"; exit 0 ;;
             *) error "无效选项，请输入数字1-3"
                sleep 1
@@ -493,4 +583,12 @@ main_menu() {
 }
 
 # ======================== 🚀 脚本入口 ========================
-main_menu
+# 处理参数
+parse_args "$@"
+
+# 无参数时进入交互菜单
+case "$ACTION" in
+    install)    install_hysteria ;;
+    uninstall)  uninstall_hysteria ;;
+    *)          [ $# -eq 0 ] && main_menu || show_help ;;
+esac
