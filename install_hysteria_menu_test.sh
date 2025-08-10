@@ -17,7 +17,7 @@ PURPLE='\033[1;35m'   # 亮紫 - 重试/特殊提示
 NC='\033[0m'          # 颜色重置
 
 # ==================== 输出函数 ====================
-info()    { echo -e "${BLUE}[信息]${NC} $1"; }                  # 常规信息
+info()    { echo -e "${BLUE}[信息] $1${NC}"; }                  # 常规信息
 success() { echo -e "${GREEN}[成功]${NC} $1"; }                 # 成功操作
 warning() { echo -e "${YELLOW}[警告]${NC} $1"; }                # 非致命警告
 error()   { echo -e "${RED}[错误]${NC} $1" >&2; }               # 致命错误（输出到stderr）
