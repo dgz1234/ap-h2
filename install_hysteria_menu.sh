@@ -17,12 +17,12 @@ PURPLE='\033[1;35m'   # 亮紫 - 重试/特殊提示
 NC='\033[0m'          # 颜色重置
 
 # ==================== 输出函数 ====================
-info()    { echo -e "${BLUE}[信息]${NC} $1"; }                  # 常规信息
-success() { echo -e "${GREEN}[成功]${NC} $1"; }                 # 成功操作
-warning() { echo -e "${YELLOW}[警告]${NC} $1"; }                # 非致命警告
-error()   { echo -e "${RED}[错误]${NC} $1" >&2; }               # 致命错误（输出到stderr）
-retry()   { echo -e "${PURPLE}[重试]${NC} $1"; }                # 重试提示
-confirm() { echo -e "${BLUE}[确认]${NC} $1 [y/N]: "; }          # 确认提示（新增）
+info()    { echo -e "${BLUE}[信息] $1${NC}"; }                  # 常规信息
+success() { echo -e "${GREEN}[成功] $1${NC}"; }                 # 成功操作
+warning() { echo -e "${YELLOW}[警告] $1${NC}"; }                # 非致命警告
+error()   { echo -e "${RED}[错误] $1${NC}" >&2; }               # 致命错误（输出到stderr）
+retry()   { echo -e "${PURPLE}[重试] $1${NC}"; }                # 重试提示
+confirm() { echo -e "${BLUE}[确认] $1${NC} [y/N]: "; }          # 确认提示（新增）
 
 # ==================== 帮助文档函数 ====================
 show_help() {
