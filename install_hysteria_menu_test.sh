@@ -9,57 +9,44 @@ SCRIPT_VERSION="1.1.0"
 DOC_URL="https://v2.hysteria.network/zh/docs/getting-started/Installation/"
 ACTION=""
 # ==================== 颜色定义 ====================
-# 基础颜色
-BLUE='\033[1;34m'     # 亮蓝 - 信息/标题
+BLUE='\033[1;34m'     # 亮蓝 - 信息
 GREEN='\033[1;32m'    # 亮绿 - 成功
 YELLOW='\033[1;33m'   # 亮黄 - 警告
 RED='\033[1;31m'      # 亮红 - 错误
 PURPLE='\033[1;35m'   # 亮紫 - 重试/特殊提示
-CYAN='\033[1;36m'     # 亮青 - 分隔线/标题
-WHITE='\033[1;37m'    # 亮白 - 普通文本
 NC='\033[0m'          # 颜色重置
 
-# ==================== 消息类型函数 ====================
-# 核心消息函数
+# ==================== 输出函数 ====================
 info()    { echo -e "${BLUE}[信息]${NC} $1"; }                  # 常规信息
 success() { echo -e "${GREEN}[成功]${NC} $1"; }                 # 成功操作
 warning() { echo -e "${YELLOW}[警告]${NC} $1"; }                # 非致命警告
 error()   { echo -e "${RED}[错误]${NC} $1" >&2; }               # 致命错误（输出到stderr）
 retry()   { echo -e "${PURPLE}[重试]${NC} $1"; }                # 重试提示
-confirm() { echo -e "${BLUE}[确认]${NC} $1 [y/N]: "; }          # 确认提示
-
-# 新增消息类型函数
-title()     { echo -e "${CYAN}$1${NC}"; }                       # 标题/分隔线
-text()      { echo -e "${WHITE}$1${NC}"; }                      # 普通文本
-highlight() { echo -e "${GREEN}$1${NC}"; }                      # 高亮文本
-note()      { echo -e "${YELLOW}$1${NC}"; }                     # 注意事项
-important() { echo -e "${RED}$1${NC}"; }                        # 重要提示
-special()   { echo -e "${PURPLE}$1${NC}"; }                     # 特殊提示
-divider()   { echo -e "${CYAN}====================================${NC}"; }  # 分隔线
+confirm() { echo -e "${BLUE}[确认]${NC} $1 [y/N]: "; }          # 确认提示（新增）
 
 # ==================== 帮助文档函数 ====================
 show_help() {
-    title "Hysteria2 安装工具 v${SCRIPT_VERSION}"
-    text "适用环境: Alpine Linux LXC (IPv6-only)"
+    echo -e "${GREEN}Hysteria2 安装工具 v${SCRIPT_VERSION}${NC}"
+    echo -e "适用环境: Alpine Linux LXC (IPv6-only)"
     echo
-    title "用法:"
-    text "  install_hysteria.sh [选项]"
+    echo -e "${BLUE}用法:${NC}"
+    echo -e "  install_hysteria.sh [选项]"
     echo
-    title "选项:"
-    highlight "  -h, --help      显示此帮助信息"
-    highlight "  -v, --version   显示版本信息"
-    highlight "  install         安装Hysteria2 (默认选项)"
-    highlight "  uninstall       卸载Hysteria2"
+    echo -e "${YELLOW}选项:${NC}"
+    echo -e "  ${GREEN}-h, --help${NC}     显示此帮助信息"
+    echo -e "  ${GREEN}-v, --version${NC}  显示版本信息"
+    echo -e "  ${GREEN}install${NC}        安装Hysteria2 (默认选项)"
+    echo -e "  ${GREEN}uninstall${NC}      卸载Hysteria2"
     echo
-    special "示例:"
-    text "  install_hysteria.sh install"
-    text "  install_hysteria.sh --help"
+    echo -e "${PURPLE}示例:${NC}"
+    echo -e "  install_hysteria.sh install"
+    echo -e "  install_hysteria.sh --help"
     echo
-    important "注意:"
-    text "  1. 需要root权限执行"
-    text "  2. 推荐使用以下方式安装："
-    text "     curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/main/install_hysteria.sh | bash"
-    text "  3. 完整文档: ${DOC_URL}"
+    echo -e "${RED}注意:${NC}"
+    echo -e "  1. 需要root权限执行"
+    echo -e "  2. 推荐使用以下方式安装："
+    echo -e "     curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/main/install_hysteria.sh | bash"
+    echo -e "  3. 完整文档: ${DOC_URL}"
     exit 0
 }
 
@@ -77,21 +64,22 @@ parse_args() {
     done
 }
 show_version() {
-    highlight "hysteria-installer v${SCRIPT_VERSION}"
+    echo "hysteria-installer v${SCRIPT_VERSION}"
     exit 0
 }
 
 # ==================== 显示大标题 ==================== 
 show_header() {
     clear
-    title "  _   _ _   _ _____ _____ ____  ___ ____  "
-    title " | | | | | | |_   _| ____|  _ \|_ _|  _ \ "
-    title " | |_| | | | | | | |  _| | |_) || || |_) |"
-    title " |  _  | |_| | | | | |___|  _ < | ||  __/ "
-    title " |_| |_|\___/  |_| |_____|_| \_\___|_|    "
-    echo
-    title "Alpine Linux Hysteria2 安装脚本"
-    text "                                           "
+    echo -e "${BLUE}"
+    echo "  _   _ _   _ _____ _____ ____  ___ ____  "
+    echo " | | | | | | |_   _| ____|  _ \|_ _|  _ \ "
+    echo " | |_| | | | | | | |  _| | |_) || || |_) |"
+    echo " |  _  | |_| | | | | |___|  _ < | ||  __/ "
+    echo " |_| |_|\___/  |_| |_____|_| \_\___|_|    "
+    echo -e "${NC}"
+    echo -e "${YELLOW}Alpine Linux Hysteria2 安装脚本${NC}"
+    echo "                                           "
 }
 # ======================== 🔧 工具函数 ========================
 # 检查IPv4支持
@@ -133,7 +121,7 @@ get_remote_version() {
     for ((i=1; i<=$max_retries; i++)); do
         version=$(_fetch_via_api)
         if [ $? -eq 0 ] && [ -n "$version" ]; then
-            highlight "$version"
+            echo "$version"
             return 0
         else
             warning "[尝试 $i/$max_retries] API获取失败，等待 ${retry_delay}秒后重试..."
@@ -146,7 +134,7 @@ get_remote_version() {
     version=$(_fetch_via_web)
     
     if [ -n "$version" ]; then
-        highlight "$version"
+        echo "$version"
     else
         error "错误：所有版本获取方式均失败"
         return 1
@@ -158,7 +146,7 @@ _fetch_via_api() {
         https://api.github.com/repos/apernet/hysteria/releases/latest 2>/dev/null |
         grep -o '"tag_name": *"[^"]*"' |
         cut -d'"' -f4 |
-        sed 's|^app/v||;s|^v||' || error "API获取失败"
+        sed 's|^app/v||;s|^v||'
 }
 
 _fetch_via_web() {
@@ -166,7 +154,7 @@ _fetch_via_web() {
         https://github.com/apernet/hysteria/releases/latest 2>/dev/null |
         tr -d '\r' |
         awk -F'/' '/location:/{print $NF}' |
-        sed 's|^app/v||;s|^v||' || error "Web获取失败"
+        sed 's|^app/v||;s|^v||'
 }
 
 # 获取本地版本（超强兼容）
@@ -174,9 +162,9 @@ get_local_version() {
     if [ -x "/usr/local/bin/hysteria" ]; then
         /usr/local/bin/hysteria version 2>/dev/null |
         grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' |
-        head -1 || error "get_failed"
+        head -1 || echo "get_failed"
     else
-        note "not_installed"
+        echo "not_installed"
     fi
 }
 # ======================== ⬇️ 分层下载实现 ========================
@@ -312,32 +300,32 @@ generate_config_file() {
     local password=$2
     
     # 获取上行带宽设置
-    note "┌────────────────────────────────────────────────────────────┐"
-    note "│ ⚠ 带宽参数直接影响Hysteria2的速率和稳定性，请真实输入！       │"
-    note "├────────────────────────────────────────────────────────────┤"
-    note "│ 中国移动300兆家庭带宽参考值：上行345mbps，下行46mbps            │"
-    note "└────────────────────────────────────────────────────────────┘"
+    echo -e "${YELLOW}┌────────────────────────────────────────────────────────────┐"
+    echo -e "│ ${BLUE}⚠ 带宽参数直接影响Hysteria2的速率和稳定性，请真实输入！${YELLOW}       │"
+    echo -e "├────────────────────────────────────────────────────────────┤"
+    echo -e "│ ${NC}中国移动300兆家庭带宽参考值：上行345mbps，下行46mbps${YELLOW}            │"
+    echo -e "└────────────────────────────────────────────────────────────┘${NC}"
 
     while true; do
-        note "┌────────────────────────────────────────────────────────────┐"
-        echo -ne "│ ↳ 请输入上行带宽 (默认: 345 mbps): "
+        echo -e "${YELLOW}┌────────────────────────────────────────────────────────────┐"
+        echo -ne "│ ${BLUE}↳ 请输入上行带宽 ${NC}(${GREEN}默认: 345 mbps${NC}): ${YELLOW}"
         read -r up_bandwidth
         up_bandwidth=${up_bandwidth:-"345 mbps"}
         
-        echo -ne "│ ↳ 请输入下行带宽 (默认: 46 mbps): "
+        echo -ne "│ ${BLUE}↳ 请输入下行带宽 ${NC}(${GREEN}默认: 46 mbps${NC}): ${YELLOW}"
         read -r down_bandwidth
         down_bandwidth=${down_bandwidth:-"46 mbps"}
-        note "└────────────────────────────────────────────────────────────┘"
+        echo -e "└────────────────────────────────────────────────────────────┘${NC}"
 
-        note "┌────────────────────────────────────────────────────────────┐"
-        note "│ ✔ 当前设置: 上行 ${up_bandwidth} 下行 ${down_bandwidth}                    │"
-        note "├────────────────────────────────────────────────────────────┤"
-        note "│ 是否确认配置？                                            │"
-        note "│ [Y]es 确认配置   [N]o 重新输入   [C]ancel 中止安装 │"
-        note "└────────────────────────────────────────────────────────────┘"
+        echo -e "${YELLOW}┌────────────────────────────────────────────────────────────┐"
+        echo -e "│ ${BLUE}✔ 当前设置: 上行 ${GREEN}${up_bandwidth}${BLUE} 下行 ${GREEN}${down_bandwidth}${YELLOW}                    │"
+        echo -e "├────────────────────────────────────────────────────────────┤"
+        echo -e "│ ${BLUE}是否确认配置？${NC}                                            │"
+        echo -e "│ ${GREEN}[Y]${NC}es 确认配置   ${RED}[N]${NC}o 重新输入   ${PURPLE}[C]${NC}ancel 中止安装 │"
+        echo -e "└────────────────────────────────────────────────────────────┘${NC}"
         
         while true; do
-            read -p "$(confirm "请选择 [Y/N/C]: ")" confirm
+            read -p "$(echo -e "${BLUE}↳ 请选择 [Y/N/C]: ${NC}")" confirm
             case $confirm in
                 [yY]*) 
                     info "正在生成配置文件..."
@@ -371,7 +359,7 @@ EOF
                     exit 1
                     ;;
                 *) 
-                    error "无效输入，请重新选择"
+                    echo -e "${RED}无效输入，请重新选择${NC}"
                     ;;
             esac
         done
@@ -472,40 +460,44 @@ show_installation_result() {
         case "$cloudflare_ip" in
             *.*.*.*)
                 ipv4="$cloudflare_ip"
-                success "Cloudflare检测到IPv4: $ipv4"
+                echo "Cloudflare检测到IPv4: $ipv4"
                 ;;
             *:*)
                 ipv6="$cloudflare_ip"
-                success "Cloudflare检测到IPv6: $ipv6"
+                echo "Cloudflare检测到IPv6: $ipv6"
                 ;;
             *)
-                warning "Cloudflare返回无效IP格式"
+                echo "Cloudflare返回无效IP格式"
                 ;;
         esac
     else
         # 方法2：Cloudflare检测失败时使用备用API
-        warning "Cloudflare检测失败，使用备用API"
-        ipv4=$(wget -4 -qO- --timeout=3 https://api.ipify.org 2>/dev/null || error "未检测到IPv4地址")
-        ipv6=$(wget -6 -qO- --timeout=3 https://api6.ipify.org 2>/dev/null || error "未检测到IPv6地址")
+        echo "Cloudflare检测失败，使用备用API"
+        ipv4=$(wget -4 -qO- --timeout=3 https://api.ipify.org 2>/dev/null || echo "未检测到IPv4地址")
+        ipv6=$(wget -6 -qO- --timeout=3 https://api6.ipify.org 2>/dev/null || echo "未检测到IPv6地址")
     fi
     
     # 最终输出
-    success "\nHysteria 安装完成！"
-    divider
-    title "以下是节点信息:"
-    text "hysteria2://${password}@${ipv4}:${port}?sni=www.bing.com&alpn=h3&insecure=1#alpine-hysteria"
+    echo "----------------------"
+    echo "最终检测结果："
+    echo "IPv4: $ipv4"
+    echo "IPv6: $ipv6"
+    echo -e "${GREEN}\nHysteria 安装完成！${NC}"
+    echo "===================================="
+    echo -e "${BLUE}以下是节点信息:${NC}"
+    echo "hysteria2://${password}@${ipv4}:${port}?sni=www.bing.com&alpn=h3&insecure=1#alpine-hysteria"
     if [ -n "$ipv6" ] && [ "$ipv6" != "你的IPv6地址" ]; then
-        text "hysteria2://${password}@[${ipv6}]:${port}?sni=www.bing.com&alpn=h3&insecure=1#alpine-hysteria-ipv6"
+        echo "hysteria2://${password}@[${ipv6}]:${port}?sni=www.bing.com&alpn=h3&insecure=1#alpine-hysteria-ipv6"
     fi
-    divider
-    important "重要提示:"
-    text "如果你使用ipv6节点信息，请确认客户端支持IPv6连接"
-    divider
-    title "服务管理命令:"
-    text "启动: /etc/init.d/hysteria start"
-    text "停止: /etc/init.d/hysteria stop"
-    text "重启: /etc/init.d/hysteria restart"
-    text "状态: /etc/init.d/hysteria status"
+    echo "===================================="
+    echo -e "${RED}重要提示:${NC}"
+    echo "如果你使用ipv6节点信息，请确认客户端支持IPv6连接"
+    echo "===================================="
+    echo -e "${YELLOW}服务管理命令:${NC}"
+    echo "启动: /etc/init.d/hysteria start"
+    echo "停止: /etc/init.d/hysteria stop"
+    echo "重启: /etc/init.d/hysteria restart"
+    echo "状态: /etc/init.d/hysteria status"
 }
 
 # 卸载 hysteria
@@ -523,7 +515,7 @@ uninstall_hysteria() {
                     exit 0
                     ;;
                 *) 
-                    error "无效输入，请输入 Y/y 或 N/n"
+                    echo -e "${RED}无效输入，请输入 Y/y 或 N/n${NC}"
                     ;;
             esac
         done
@@ -567,16 +559,16 @@ main_menu() {
     while true; do
         show_header
         echo
-        title "================ 🔄 版本控制 ================"
+        echo -e "${BLUE}================ 🔄 版本控制 ================${NC}"
         echo
-        text "最新版本: $(get_remote_version)"
-        text "本地版本: $(get_local_version)"
+        echo "最新版本: $(get_remote_version)"
+        echo "本地版本: $(get_local_version)"
         echo
-        title "================ 🖥️ 用户界面 ================"
+        echo -e "${GREEN}================ 🖥️ 用户界面 ================${NC}"
         echo
-        title "1. 安装 hysteria2\n2. 卸载 hysteria2\n3. 退出脚本"
+        echo -e "${BLUE}1. 安装 hysteria2\n2. 卸载 hysteria2\n3. 退出脚本${NC}"
         echo
-        title "================ 🚀 脚本入口 ================"
+        echo -e "${YELLOW}================ 🚀 脚本入口 ================${NC}"
         echo
         read -p "请输入选项 [1-3]: " choice
         case "$choice" in
