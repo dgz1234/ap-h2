@@ -252,25 +252,36 @@ generate_config_file() {
     local password=$2
     
     # 获取上行带宽设置
-    echo -e "${YELLOW}[警告]${NC} 带宽参数非常重要，直接影响Hysteria2的速率和稳定性，请真实输入！"
-    echo -e "${BLUE}[信息]${NC} 中国移动300兆家庭带宽的参考设置：上行345mbps，下行46mbps"
-    
+    echo -e "${YELLOW}┌────────────────────────────────────────────────────────────┐"
+    echo -e "│ ${BLUE}⚠ 带宽参数直接影响Hysteria2的速率和稳定性，请真实输入！${YELLOW}       │"
+    echo -e "├────────────────────────────────────────────────────────────┤"
+    echo -e "│ ${NC}中国移动300兆家庭带宽参考值：上行345mbps，下行46mbps${YELLOW}            │"
+    echo -e "└────────────────────────────────────────────────────────────┘${NC}"
+
     while true; do
-        echo -ne "${YELLOW}[输入]${NC} 请输入上行带宽 (默认: 345 mbps): "
+        echo -e "${YELLOW}┌────────────────────────────────────────────────────────────┐"
+        echo -ne "│ ${BLUE}↳ 请输入上行带宽 ${NC}(${GREEN}默认: 345 mbps${NC}): ${YELLOW}"
         read -r up_bandwidth
         up_bandwidth=${up_bandwidth:-"345 mbps"}
         
-        echo -ne "${YELLOW}[输入]${NC} 请输入下行带宽 (默认: 46 mbps): "
+        echo -ne "│ ${BLUE}↳ 请输入下行带宽 ${NC}(${GREEN}默认: 46 mbps${NC}): ${YELLOW}"
         read -r down_bandwidth
         down_bandwidth=${down_bandwidth:-"46 mbps"}
+        echo -e "└────────────────────────────────────────────────────────────┘${NC}"
+
+        echo -e "${YELLOW}┌────────────────────────────────────────────────────────────┐"
+        echo -e "│ ${BLUE}✔ 当前设置: 上行 ${GREEN}${up_bandwidth}${BLUE} 下行 ${GREEN}${down_bandwidth}${YELLOW}                    │"
+        echo -e "├────────────────────────────────────────────────────────────┤"
+        echo -e "│ ${BLUE}是否确认配置？${NC}                                            │"
+        echo -e "│ ${GREEN}[Y]${NC}es 确认配置   ${RED}[N]${NC}o 重新输入   ${PURPLE}[C]${NC}ancel 中止安装 │"
+        echo -e "└────────────────────────────────────────────────────────────┘${NC}"
         
-        echo -e "${BLUE}[确认]${NC} 您设置的带宽为: 上行 ${GREEN}$up_bandwidth${NC}, 下行 ${GREEN}$down_bandwidth${NC}"
-        read -p "是否确认？(y/N) " confirm
-        [[ $confirm =~ [yY] ]] && break
-    done
-    
-    info "正在生成配置文件..."
-    cat > /etc/hysteria/config.yaml <<EOF
+        while true; do
+            read -p "$(echo -e "${BLUE}↳ 请选择 [Y/N/C]: ${NC}")" confirm
+            case $confirm in
+                [yY]*) 
+                    info "正在生成配置文件..."
+                    cat > /etc/hysteria/config.yaml <<EOF
 listen: :${port}
 tls:
   cert: /etc/hysteria/server.crt
@@ -287,8 +298,24 @@ masquerade:
     url: https://bing.com/
     rewriteHost: true
 EOF
-    chown hysteria:hysteria /etc/hysteria/config.yaml
-    success "配置文件已生成"
+                    chown hysteria:hysteria /etc/hysteria/config.yaml
+                    success "配置文件已生成"
+                    return 0
+                    ;;
+                [nN]*) 
+                    retry "正在重新输入带宽参数..."
+                    break
+                    ;;
+                [cC]*) 
+                    error "用户已取消安装"
+                    exit 1
+                    ;;
+                *) 
+                    echo -e "${RED}无效输入，请重新选择${NC}"
+                    ;;
+            esac
+        done
+    done
 }
 # 配置系统服务
 configure_system_service() {
