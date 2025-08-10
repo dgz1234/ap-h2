@@ -11,6 +11,8 @@ bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/main/install-w
 完美支持
 0.42机器类型:Alpine Linux-LXC容器-IPv6-only-无NAT64网关-wireguard内核支持-客户端root-60G内存-90M磁盘
 
+# 🛠️ 脚本提供了两种安装模式
+
 ## 🖥 智能交互模式
 
 使用演示
@@ -123,27 +125,17 @@ bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/refs/heads/mai
 注：所有安装脚本会自动清理临时文件，不会在系统中留下冗余数据
 
 
-## 🚀 极速命令行模式
+# 🚀 极速命令行模式
 
-快速查看帮助
+## 快速查看帮助
 ```
-bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/main/install_hysteria_command.sh) help
+bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/refs/heads/main/install_hysteria_menu.sh) --help
 ```
-基础部署 (使用默认配置)
+## 快速使用默认配置部署
 ```
-bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/refs/heads/main/install_hysteria_command.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/refs/heads/main/install_hysteria_menu.sh) install
 ```
-自定义端口部署
+## 快速卸载方式：
 ```
-bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/refs/heads/main/install_hysteria_command.sh) --port 443
+bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/refs/heads/main/install_hysteria_menu.sh) uninstall
 ```
-完全自定义部署
-```
-bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/refs/heads/main/install_hysteria_command.sh) --port 443 --password "Your$tr0ngP@ss"
-```
-# 卸载方式：
-```
-bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/refs/heads/main/install_hysteria_command.sh) uninstall
-```
-
-
