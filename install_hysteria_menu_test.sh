@@ -251,6 +251,16 @@ generate_config_file() {
     local port=$1
     local password=$2
     
+    # 获取上行带宽设置
+    warning "带宽参数非常重要，直接影响Hysteria2的速率和稳定性，请真实输入！"
+    info "中国移动300兆家庭带宽的参考设置：上行345mbps，下行46mbps"
+    
+    read -p "$(echo -e "${YELLOW}[输入]${NC} 请输入上行带宽 (默认: 345 mbps): ")" up_bandwidth
+    up_bandwidth=${up_bandwidth:-"345 mbps"}
+    
+    read -p "$(echo -e "${YELLOW}[输入]${NC} 请输入下行带宽 (默认: 46 mbps): ")" down_bandwidth
+    down_bandwidth=${down_bandwidth:-"46 mbps"}
+    
     info "正在生成配置文件..."
     cat > /etc/hysteria/config.yaml <<EOF
 listen: :${port}
@@ -261,8 +271,8 @@ auth:
   type: password
   password: ${password}
 bandwidth:
-  up: 400 mbps
-  down: 60 mbps
+  up: ${up_bandwidth}
+  down: ${down_bandwidth}
 masquerade:
   type: proxy
   proxy:
@@ -272,7 +282,6 @@ EOF
     chown hysteria:hysteria /etc/hysteria/config.yaml
     success "配置文件已生成"
 }
-
 # 配置系统服务
 configure_system_service() {
     info "正在配置系统服务..."
