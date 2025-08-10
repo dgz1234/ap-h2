@@ -14,16 +14,21 @@ GREEN='\033[1;32m'    # 亮绿 - 成功
 YELLOW='\033[1;33m'   # 亮黄 - 警告
 RED='\033[1;31m'      # 亮红 - 错误
 PURPLE='\033[1;35m'   # 亮紫 - 重试/特殊提示
+BOLD='\033[1m'        # 粗体
 NC='\033[0m'          # 颜色重置
 
 # ==================== 输出函数 ====================
-info()    { echo -e "${BLUE}[信息]${NC} $1"; }                  # 常规信息
-success() { echo -e "${GREEN}[成功]${NC} $1"; }                 # 成功操作
-warning() { echo -e "${YELLOW}[警告]${NC} $1"; }                # 非致命警告
-error()   { echo -e "${RED}[错误]${NC} $1" >&2; }               # 致命错误（输出到stderr）
-retry()   { echo -e "${PURPLE}[重试]${NC} $1"; }                # 重试提示
-confirm() { echo -e "${BLUE}[确认]${NC} $1 [y/N]: "; }          # 确认提示（新增）
+info()    { echo -e "${BOLD}[信息]${NC} ${BLUE}$*${NC}"; }                  # 标签粗体，内容蓝色
+success() { echo -e "${BOLD}[成功]${NC} ${GREEN}$*${NC}"; }                 # 标签粗体，内容绿色
+warning() { echo -e "${BOLD}[警告]${NC} ${YELLOW}$*${NC}"; }                # 标签粗体，内容黄色
+error()   { echo -e "${BOLD}[错误]${NC} ${RED}$*${NC}" >&2; }               # 标签粗体，内容红色（stderr）
+retry()   { echo -e "${BOLD}[重试]${NC} ${PURPLE}$*${NC}"; }                # 标签粗体，内容紫色
 
+confirm() {
+  echo -ne "${BOLD}[确认]${NC} ${BLUE}$*${NC} [y/N]: "                      # 标签粗体，内容蓝色
+  read -r answer
+  [[ "$answer" =~ ^[Yy]$ ]]
+}
 # ==================== 帮助文档函数 ====================
 show_help() {
     echo -e "${GREEN}Hysteria2 安装工具 v${SCRIPT_VERSION}${NC}"
