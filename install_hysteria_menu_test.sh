@@ -72,22 +72,17 @@ show_version() {
 show_header() {
     clear
     echo -e "${BLUE}"
-    cat << "EOF"
- ________  ________  ________   _____    _______  ________  ___   ___     
-|\   ___ \|\   ____\|\_____  \ / __  \  /  ___  \|\_____  \|\  \ |\  \    
-\ \  \_|\ \ \  \___| \|___/  /|\/_|\  \/__/|_/  /\|____|\ /\ \  \\_\  \   
- \ \  \ \\ \ \  \  ___   /  / ||/ \ \  \__|//  / /     \|\  \ \______  \  
-  \ \  \_\\ \ \  \|\  \ /  /_/__   \ \  \  /  /_/__   __\_\  \|_____|\  \ 
-   \ \_______\ \_______\\________\  \ \__\|\________\|\_______\     \ \__\
-    \|_______|\|_______|\|_______|   \|__| \|_______|\|_______|      \|__|
-                                                                          
-EOF
+    echo "  _   _ _   _ _____ _____ ____  ___ ____  "
+    echo " | | | | | | |_   _| ____|  _ \|_ _|  _ \ "
+    echo " | |_| | | | | | | |  _| | |_) || || |_) |"
+    echo " |  _  | |_| | | | | |___|  _ < | ||  __/ "
+    echo " |_| |_|\___/  |_| |_____|_| \_\___|_|    "
     echo -e "${NC}"
     echo -e "${YELLOW}Alpine Linux Hysteria2 安装脚本${NC}"
     echo "                                           "
 }
 # ======================== 🔧 工具函数 ========================
-# 检查IPv4支持
+# 1.检查IPv4支持
 check_ipv4() {
     info "网络环境检测中......"
     if ping -c 1 -W 1 1.1.1.1 >/dev/null 2>&1; then
@@ -100,23 +95,9 @@ check_ipv4() {
     fi
 }
 
-# 安装依赖
-install_dependencies() {
-    info "正在检测相关依赖..."
-    if ! command -v openssl >/dev/null 2>&1; then
-        warning "openssl未安装，正在安装..."
-        apk add --no-cache openssl || {
-            error "openssl安装失败"
-            return 1
-        }
-        success "openssl已安装"
-    else
-        success "openssl已正常安装"
-    fi
-    return 0
-}
+# 2.版本控制
 # ======================== 🔄 版本检查与更新 ========================
-# 获取远程版本（完美处理 app/v 前缀）
+# 2.1.获取远程版本（完美处理 app/v 前缀）
 get_remote_version() {
     local version
     local max_retries=2
@@ -146,6 +127,7 @@ get_remote_version() {
     fi
 }
 
+# 2.1.1.API方式获取远程版本   
 _fetch_via_api() {
     curl --connect-timeout 5 -fsSL \
         https://api.github.com/repos/apernet/hysteria/releases/latest 2>/dev/null |
@@ -154,6 +136,7 @@ _fetch_via_api() {
         sed 's|^app/v||;s|^v||'
 }
 
+# 2.1.2.非API方式获取远程版本
 _fetch_via_web() {
     curl -fsSL -I \
         https://github.com/apernet/hysteria/releases/latest 2>/dev/null |
@@ -162,7 +145,7 @@ _fetch_via_web() {
         sed 's|^app/v||;s|^v||'
 }
 
-# 获取本地版本（超强兼容）
+# 2.2.获取本地版本（超强兼容）
 get_local_version() {
     if [ -x "/usr/local/bin/hysteria" ]; then
         /usr/local/bin/hysteria version 2>/dev/null |
@@ -170,55 +153,6 @@ get_local_version() {
         head -1 || echo "get_failed"
     else
         echo "not_installed"
-    fi
-}
-# ======================== ⬇️ 分层下载实现 ========================
-_download_and_install() {
-    # 函数: _download_and_install
-    # 用途: 核心安装逻辑 (私有函数)
-    # 参数:
-    #   $1: 下载URL
-    #   $2: 临时文件路径
-    # 返回:
-    #   0: 成功 | 1: 下载失败 | 2: 权限错误
-    local url=$1
-    local tmp_file=$2
-
-    if ! curl -#fSL "$url" -o "$tmp_file"; then
-        error "下载失败"
-        return 1
-    fi
-
-    chmod +x "$tmp_file" || return 2
-    mv "$tmp_file" /usr/local/bin/hysteria || return 3
-    return 0
-}
-
-download_hysteria() {
-    # 函数: download_hysteria
-    # 用途: 带架构检测的下载器
-    # 参数:
-    #   $1: 版本号 (如 2.6.2)
-    local version=$1
-    local arch
-    
-    case $(uname -m) in
-        x86_64) arch="amd64" ;;
-        aarch64) arch="arm64" ;;
-        *) error "不支持的架构"; return 1 ;;
-    esac
-
-    local tmp_file=$(mktemp)
-    trap "rm -f '$tmp_file'" EXIT
-
-    info "正在下载 v$version [$arch]..."
-    if _download_and_install \
-       "https://github.com/apernet/hysteria/releases/download/app/v$version/hysteria-linux-$arch" \
-       "$tmp_file"; then
-        success "下载成功"
-    else
-        error "下载失败 (错误码: $?)"
-        return 1
     fi
 }
 
@@ -289,7 +223,75 @@ version_gt() {
     test "$(printf '%s\n' "$@" | sort -V | head -n 1)" != "$1"
 }
 
-# 生成自签名证书
+# ======================== ⬇️ 分层下载实现 ========================
+
+download_hysteria() {
+    # 函数: download_hysteria
+    # 用途: 带架构检测的下载器
+    # 参数:
+    #   $1: 版本号 (如 2.6.2)
+    local version=$1
+    local arch
+    
+    case $(uname -m) in
+        x86_64) arch="amd64" ;;
+        aarch64) arch="arm64" ;;
+        *) error "不支持的架构"; return 1 ;;
+    esac
+
+    local tmp_file=$(mktemp)
+    trap "rm -f '$tmp_file'" EXIT
+
+    info "正在下载 v$version [$arch]..."
+    if _download_and_install \
+       "https://github.com/apernet/hysteria/releases/download/app/v$version/hysteria-linux-$arch" \
+       "$tmp_file"; then
+        success "下载成功"
+    else
+        error "下载失败 (错误码: $?)"
+        return 1
+    fi
+}
+
+_download_and_install() {
+    # 函数: _download_and_install
+    # 用途: 核心安装逻辑 (私有函数)
+    # 参数:
+    #   $1: 下载URL
+    #   $2: 临时文件路径
+    # 返回:
+    #   0: 成功 | 1: 下载失败 | 2: 权限错误
+    local url=$1
+    local tmp_file=$2
+
+    if ! curl -#fSL "$url" -o "$tmp_file"; then
+        error "下载失败"
+        return 1
+    fi
+
+    chmod +x "$tmp_file" || return 2
+    mv "$tmp_file" /usr/local/bin/hysteria || return 3
+    return 0
+}
+
+# 3.安装依赖
+install_dependencies() {
+    info "正在检测相关依赖..."
+    if ! command -v openssl >/dev/null 2>&1; then
+        warning "openssl未安装，正在安装..."
+        apk add --no-cache openssl || {
+            error "openssl安装失败"
+            return 1
+        }
+        success "openssl已安装"
+    else
+        success "openssl已正常安装"
+    fi
+    return 0
+}
+
+
+# 4.生成自签名证书
 generate_self_signed_cert() {
     info "正在生成自签名证书..."
     openssl ecparam -genkey -name prime256v1 -out /etc/hysteria/server.key
@@ -299,7 +301,7 @@ generate_self_signed_cert() {
     success "自签名证书已生成"
 }
 
-# 生成配置文件
+# 5.生成配置文件
 generate_config_file() {
     local port=$1
     local password=$2
@@ -370,7 +372,7 @@ EOF
         done
     done
 }
-# 配置系统服务
+# 6.配置系统服务
 configure_system_service() {
     info "正在配置系统服务..."
     cat > /etc/init.d/hysteria <<EOF
@@ -396,7 +398,7 @@ EOF
     success "系统服务已配置"
 }
 
-# 安装 hysteria
+# 7.安装 hysteria
 install_hysteria() {
     # 1.检查IPv4支持
     check_ipv4 || return 1
@@ -404,6 +406,7 @@ install_hysteria() {
     check_and_update_version || return 1
     # 3.安装依赖
     install_dependencies || return 1
+
     read -p "请输入监听端口 (默认: 36711): " port
     port=${port:-36711}
     read -p "请输入密码 (留空将自动生成): " password
@@ -443,7 +446,7 @@ install_hysteria() {
     show_installation_result "$port" "$password"
 }
 
-# 显示安装结果
+# 8.显示安装结果
 show_installation_result() {
     local port=$1
     local password=$2
@@ -499,13 +502,13 @@ show_installation_result() {
     echo "如果你使用ipv6节点信息，请确认客户端支持IPv6连接"
     echo "===================================="
     echo -e "${YELLOW}服务管理命令:${NC}"
-    echo "启动: /etc/init.d/hysteria start"
-    echo "停止: /etc/init.d/hysteria stop"
-    echo "重启: /etc/init.d/hysteria restart"
-    echo "状态: /etc/init.d/hysteria status"
+    echo "启动: service hysteria start"
+    echo "停止: service hysteria stop"
+    echo "重启: service hysteria restart"
+    echo "状态: service hysteria status"
 }
 
-# 卸载 hysteria
+# 9.卸载 hysteria
 uninstall_hysteria() {
     # 非交互模式判断
     if [ "$1" != "noninteractive" ]; then
