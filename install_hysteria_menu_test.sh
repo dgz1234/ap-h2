@@ -338,6 +338,9 @@ generate_config_file() {
                     info "正在生成配置文件..."
                     cat > /etc/hysteria/config.yaml <<EOF
 listen: :${port}
+# SOCKS5 代理配置
+socks5:
+  listen: "[::]:1080"  # 监听 IPv6 和 IPv4 的 1080 端口
 tls:
   cert: /etc/hysteria/server.crt
   key: /etc/hysteria/server.key
