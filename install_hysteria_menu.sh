@@ -354,8 +354,6 @@ masquerade:
     rewriteHost: true
 socks5:
   listen: "[::]:1080"
-  user: "admin"  # 可选
-  password: "${password}"  # 可选
 EOF
                     chown hysteria:hysteria /etc/hysteria/config.yaml
                     success "配置文件已生成"
