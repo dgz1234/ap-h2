@@ -152,11 +152,15 @@ while [ $retry_count -lt $MAX_RETRIES ]; do
             sleep $DELAY_SECONDS
         else
             print_msg "$RED" "× WARP账户注册失败 (尝试 $MAX_RETRIES 次后失败)"
-            if confirm "是否退出脚本？"; then
-                exit 1
-            else
-                print_msg "$YELLOW" "! 继续执行..."
+            
+            # 删除账户文件
+            if [ -f "$ACCOUNT_FILE" ]; then
+                rm -f "$ACCOUNT_FILE"
+                print_msg "$YELLOW" "! 已删除账户文件: $ACCOUNT_FILE"
             fi
+            
+            print_msg "$RED" "× 脚本执行失败，退出..."
+            exit 1
         fi
     fi
 done
