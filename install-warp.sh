@@ -136,6 +136,12 @@ retry_count=0
 while [ $retry_count -lt $MAX_RETRIES ]; do
     print_msg "$PURPLE" "尝试 $((retry_count+1))/$MAX_RETRIES: 注册WARP账户..."
     
+    # 在每次尝试前删除可能已存在的账户文件
+    if [ -f "$ACCOUNT_FILE" ]; then
+        rm -f "$ACCOUNT_FILE"
+        print_msg "$YELLOW" "! 已删除存在的账户文件: $ACCOUNT_FILE"
+    fi
+    
     if $register_cmd; then
         print_msg "$GREEN" "√ WARP账户注册成功"
         break
