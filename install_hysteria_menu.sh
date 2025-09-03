@@ -137,8 +137,63 @@ get_remote_version() {
     
     if [ -n "$version" ]; then
         echo "$version"
+        return 0
+    fi
+    
+    # 第三种方式：从指定URL下载文件并获取版本号
+    warning "正在尝试第三种方式获取版本..."
+    version=$(_fetch_via_direct_download)
+    
+    if [ -n "$version" ]; then
+        echo "$version"
     else
         error "错误：所有版本获取方式均失败"
+        return 1
+    fi
+}
+
+# 新增的第三种获取方式函数
+_fetch_via_direct_download() {
+    local temp_dir
+    local temp_file
+    local version
+    
+    # 创建临时目录
+    temp_dir=$(mktemp -d)
+    if [ $? -ne 0 ]; then
+        warning "创建临时目录失败"
+        return 1
+    fi
+    
+    # 设置退出时清理临时目录
+    trap 'rm -rf "$temp_dir"' EXIT
+    
+    temp_file="${temp_dir}/hysteria-linux-amd64"
+    
+    # 下载文件
+    info "正在从 GitHub 下载文件..."
+    if ! curl -fsSL --connect-timeout 10 \
+         "https://raw.githubusercontent.com/dgz1234/hysteria2/refs/heads/main/hysteria-linux-amd64" \
+         -o "$temp_file"; then
+        warning "文件下载失败"
+        return 1
+    fi
+    
+    # 赋予执行权限
+    chmod +x "$temp_file"
+    
+    # 获取版本号
+    info "正在提取版本信息..."
+    version=$("$temp_file" version 2>/dev/null | \
+              grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' | \
+              head -1)
+    
+    if [ -n "$version" ]; then
+        success "通过直接下载方式获取到版本: v$version"
+        echo "$version"
+        return 0
+    else
+        warning "无法从下载的文件中提取版本号"
         return 1
     fi
 }
