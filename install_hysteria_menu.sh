@@ -91,23 +91,7 @@ check_ipv4() {
     else
         error "您的网络需要IPv4支持"
         warning "如果您使用的是LXC容器-IPv6-only-无NAT64网关，建议先安装WARP"
-        echo
-        while true; do
-            read -p "$(echo -e "${YELLOW}是否继续安装？(y=继续/n=返回菜单): ${NC}")" choice
-            case "$choice" in
-                [yY]*) 
-                    warning "您选择了继续安装，网络功能可能受限"
-                    return 0  # 继续执行
-                    ;;
-                [nN]*) 
-                    info "返回主菜单..."
-                    return 1  # 返回菜单
-                    ;;
-                *) 
-                    error "无效输入，请输入 y 或 n"
-                    ;;
-            esac
-        done
+        return 1
     fi
 }
 
@@ -121,26 +105,25 @@ get_remote_version() {
     
     # 尝试API方式 (带重试机制)
     for ((i=1; i<=$max_retries; i++)); do
-        version=$(_fetch_via_api 2>/dev/null)  # 静默_fetch_via_api可能产生的错误
+        version=$(_fetch_via_api)
         if [ $? -eq 0 ] && [ -n "$version" ]; then
-            echo "$version"  # 只有成功获取版本才输出到stdout
+            echo "$version"
             return 0
         else
-            warning "[尝试 $i/$max_retries] API获取失败，等待 ${retry_delay}秒后重试..." >&2  # 确保警告输出到stderr
+            warning "[尝试 $i/$max_retries] API获取失败，等待 ${retry_delay}秒后重试..."
             sleep $retry_delay
         fi
     done
     
     # 降级到非API方式
-    warning "正在使用备用方式获取版本..." >&2  # 确保警告输出到stderr
-    version=$(_fetch_via_web 2>/dev/null)  # 静默_fetch_via_web可能产生的错误
+    warning "正在使用备用方式获取版本..."
+    version=$(_fetch_via_web)
     
     if [ -n "$version" ]; then
-        echo "$version"  # 只有成功获取版本才输出到stdout
-        return 0
+        echo "$version"
     else
-        error "最新版本获取失败" >&2  # 确保错误输出到stderr
-        return 1  # 返回错误码
+        error "错误：所有版本获取方式均失败"
+        return 1
     fi
 }
 
