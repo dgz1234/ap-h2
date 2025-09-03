@@ -121,25 +121,26 @@ get_remote_version() {
     
     # 尝试API方式 (带重试机制)
     for ((i=1; i<=$max_retries; i++)); do
-        version=$(_fetch_via_api)
+        version=$(_fetch_via_api 2>/dev/null)  # 静默_fetch_via_api可能产生的错误
         if [ $? -eq 0 ] && [ -n "$version" ]; then
-            echo "$version"
+            echo "$version"  # 只有成功获取版本才输出到stdout
             return 0
         else
-            echo "[警告] [尝试 $i/$max_retries] API获取失败，等待 ${retry_delay}秒后重试..." >&2
+            warning "[尝试 $i/$max_retries] API获取失败，等待 ${retry_delay}秒后重试..." >&2  # 确保警告输出到stderr
             sleep $retry_delay
         fi
     done
     
     # 降级到非API方式
-    echo "[警告] 正在使用备用方式获取版本..." >&2
-    version=$(_fetch_via_web)
+    warning "正在使用备用方式获取版本..." >&2  # 确保警告输出到stderr
+    version=$(_fetch_via_web 2>/dev/null)  # 静默_fetch_via_web可能产生的错误
     
     if [ -n "$version" ]; then
-        echo "$version"
+        echo "$version"  # 只有成功获取版本才输出到stdout
+        return 0
     else
-        echo "[错误] 最新版本获取失败" >&2
-        return 1
+        error "最新版本获取失败" >&2  # 确保错误输出到stderr
+        return 1  # 返回错误码
     fi
 }
 
