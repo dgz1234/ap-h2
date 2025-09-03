@@ -182,7 +182,7 @@ check_and_update_version() {
     if [ $ret -ne 0 ] || [ -z "$remote" ]; then
         error "无法获取远程版本号 (错误码: $ret)"
         error "请检查网络连接或GitHub访问状态"
-        return 1
+        return 0
     fi
 
     # 获取本地版本
