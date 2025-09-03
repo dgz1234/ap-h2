@@ -138,7 +138,7 @@ get_remote_version() {
     if [ -n "$version" ]; then
         echo "$version"
     else
-        error "错误：所有版本获取方式均失败"
+        error "最新版本获取失败"
         return 1
     fi
 }
@@ -587,6 +587,8 @@ main_menu() {
         echo
         echo -e "${BLUE}================ 🔄 版本控制 ================${NC}"
         echo
+        echo "最新版本: $(get_remote_version)"
+        echo "本地版本: $(get_local_version)"
         echo
         echo -e "${GREEN}================ 🖥️ 用户界面 ================${NC}"
         echo
