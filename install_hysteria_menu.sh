@@ -91,7 +91,23 @@ check_ipv4() {
     else
         error "您的网络需要IPv4支持"
         warning "如果您使用的是LXC容器-IPv6-only-无NAT64网关，建议先安装WARP"
-        return 1
+        echo
+        while true; do
+            read -p "$(echo -e "${YELLOW}是否继续安装？(y=继续/n=返回菜单): ${NC}")" choice
+            case "$choice" in
+                [yY]*) 
+                    warning "您选择了继续安装，网络功能可能受限"
+                    return 0  # 继续执行
+                    ;;
+                [nN]*) 
+                    info "返回主菜单..."
+                    return 1  # 返回菜单
+                    ;;
+                *) 
+                    error "无效输入，请输入 y 或 n"
+                    ;;
+            esac
+        done
     fi
 }
 
