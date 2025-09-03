@@ -587,7 +587,7 @@ main_menu() {
         echo
         echo -e "${BLUE}================ 🔄 版本控制 ================${NC}"
         echo
-        echo "最新版本: $(get_remote_version)"
+        echo "最新版本: $(check_and_update_version)"
         echo "本地版本: $(get_local_version)"
         echo
         echo -e "${GREEN}================ 🖥️ 用户界面 ================${NC}"
