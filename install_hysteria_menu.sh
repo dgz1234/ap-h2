@@ -182,7 +182,7 @@ check_and_update_version() {
     if [ $ret -ne 0 ] || [ -z "$remote" ]; then
         error "无法获取远程版本号 (错误码: $ret)"
         error "请检查网络连接或GitHub访问状态"
-        return 0
+        exit 1
     fi
 
     # 获取本地版本
@@ -587,7 +587,7 @@ main_menu() {
         echo
         echo -e "${BLUE}================ 🔄 版本控制 ================${NC}"
         echo
-        echo "最新版本: $(check_and_update_version)"
+        echo "最新版本: $(get_remote_version)"
         echo "本地版本: $(get_local_version)"
         echo
         echo -e "${GREEN}================ 🖥️ 用户界面 ================${NC}"
