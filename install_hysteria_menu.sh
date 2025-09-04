@@ -138,7 +138,7 @@ get_remote_version() {
     if [ -n "$version" ]; then
         echo "$version"
     else
-        error "版本获取失败"
+        echo "版本获取失败"
         return 1
     fi
 }
