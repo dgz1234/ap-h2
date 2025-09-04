@@ -126,17 +126,19 @@ get_remote_version() {
             echo "$version"
             return 0
         else
+            # warning "[尝试 $i/$max_retries] API获取失败，等待 ${retry_delay}秒后重试..."
             sleep $retry_delay
         fi
     done
     
     # 降级到非API方式
+    # warning "正在使用备用方式获取版本..."
     version=$(_fetch_via_web)
     
     if [ -n "$version" ]; then
         echo "$version"
     else
-        echo "获取版本失败"
+        error "版本获取失败"
         return 1
     fi
 }
