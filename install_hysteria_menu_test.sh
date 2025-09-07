@@ -490,7 +490,7 @@ generate_config_file() {
             case $confirm in
                 [yY]*) 
                     info "正在生成配置文件..."
-                    cat > /etc/hysteria/config.yaml <<'EOF'
+                    cat > /etc/hysteria/config.yaml <<EOF
 listen: :${port}
 tls:
   cert: /etc/hysteria/server.crt
@@ -537,7 +537,7 @@ name="hysteria"
 command="/usr/local/bin/$name"
 command_args="server --config /etc/$name/config.yaml"
 command_user="$name"
-pidfile="/var/run/\${name}.pid"
+pidfile="/var/run/${name}.pid"
 logfile="/var/log/${name}.log"
 command_background=true
 
@@ -565,6 +565,8 @@ install_hysteria() {
     install_dependencies || return 1
     # 4.创建专用用户函数
     create_hysteria_user || return 1
+     # 5.生成证书（包含目录创建和证书检查）
+    generate_self_signed_cert
 
     read -p "请输入监听端口 (默认: 36711): " port
     port=${port:-36711}
@@ -573,13 +575,9 @@ install_hysteria() {
         password=$(tr -dc 'A-Za-z0-9,_-' < /dev/urandom | head -c 24)
         info "已生成随机密码: ${password}"
     fi
-    debug_var "port" "$port"
-    debug_var "password" "$password"
-
-    # 5.生成证书（包含目录创建和证书检查）
-    generate_self_signed_cert
     # 6.生成配置文件（包含配置文件检查）
     generate_config_file "$port" "$password"
+    debug_pause "按任意键继续..."
     # 7.配置系统服务
     configure_system_service
     # 8.显示安装结果
