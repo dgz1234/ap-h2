@@ -1,11 +1,11 @@
 #!/bin/ash
-# 脚本名称：hysteria_installer.sh
+# 脚本名称：install_hysteria_menu.sh
 # 描述：Alpine Linux Hysteria2 安装工具
 # 适用机器类型：Alpine Linux-LXC容器-IPv6-only-无NAT64网关-wireguard内核支持-客户端root-64M内存-90M磁盘
 # 作者：dgz1234
 # ======================== 📦 常量定义 ========================
-SCRIPT_NAME="hysteria_installer.sh"
-SCRIPT_VERSION="1.1.0"
+SCRIPT_NAME="install_hysteria_menu.sh"
+SCRIPT_VERSION="2.0"
 DOC_URL="https://v2.hysteria.network/zh/docs/getting-started/Installation/"
 ACTION=""
 
@@ -163,7 +163,7 @@ check_ipv4() {
         success "网络环境正常 (IPv4支持)"
         return 0
     else
-        error "您的网络需要IPv4支持"
+        error "您的网络需要IPv4支持,如果你选择继续安装，则无法对IPv4-only网络的正常访问"
         warning "如果您使用的是 LXC 容器 IPv6-only 无 NAT64 网关，建议先安装 WARP"
         user_choice "检测到网络环境不支持IPv4，是否继续安装？"
         # 如果用户选择继续，user_choice 会返回 0，函数继续执行

@@ -208,11 +208,7 @@ get_remote_version() {
 
 # # 2.1.1.API方式获取远程版本   
 _fetch_via_api() {
-    curl --connect-timeout 10 \
-        --max-time 30 \
-        --retry 2 \
-        --retry-delay 1 \
-        -fsSL \
+    curl --connect-timeout 5 -fsSL \
         https://api.github.com/repos/apernet/hysteria/releases/latest 2>/dev/null |
         grep -o '"tag_name": *"[^"]*"' |
         cut -d'"' -f4 |
@@ -221,11 +217,7 @@ _fetch_via_api() {
 
 # # 2.1.2.非API方式获取远程版本
 _fetch_via_web() {
-    curl --connect-timeout 10 \
-        --max-time 30 \
-        --retry 2 \
-        --retry-delay 1 \
-        -fsSL -I \
+    curl -fsSL -I \
         https://github.com/apernet/hysteria/releases/latest 2>/dev/null |
         tr -d '\r' |
         awk -F'/' '/location:/{print $NF}' |
@@ -367,39 +359,15 @@ _download_and_install() {
     #   0: 成功 | 1: 下载失败 | 2: 权限错误
     local url=$1
     local tmp_file=$2
-    local max_retries=3
-    local retry_delay=2
 
-    for i in $(seq 1 $max_retries); do
-        info "尝试下载 (第 $i/$max_retries 次)..."
-        
-        # 使用更详细的curl参数和超时设置
-        if curl -#fSL \
-            --connect-timeout 10 \
-            --max-time 60 \
-            --retry 2 \
-            --retry-delay 1 \
-            --retry-max-time 30 \
-            "$url" -o "$tmp_file" 2>/dev/null; then
-            
-            # 检查文件是否下载成功且不为空
-            if [ -s "$tmp_file" ]; then
-                success "下载成功"
-                chmod +x "$tmp_file" || return 2
-                mv "$tmp_file" /usr/local/bin/hysteria || return 3
-                return 0
-            else
-                warning "下载的文件为空，重试中..."
-                rm -f "$tmp_file"
-            fi
-        else
-            warning "下载失败 (第 $i/$max_retries 次)，等待 ${retry_delay}秒后重试..."
-            sleep $retry_delay
-        fi
-    done
+    if ! curl -#fSL "$url" -o "$tmp_file"; then
+        error "下载失败"
+        return 1
+    fi
 
-    error "下载失败，已尝试 $max_retries 次"
-    return 1
+    chmod +x "$tmp_file" || return 2
+    mv "$tmp_file" /usr/local/bin/hysteria || return 3
+    return 0
 }
 
 # 备用下载函数
