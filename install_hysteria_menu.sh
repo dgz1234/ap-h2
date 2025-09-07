@@ -8,6 +8,10 @@ SCRIPT_NAME="hysteria_installer.sh"
 SCRIPT_VERSION="1.1.0"
 DOC_URL="https://v2.hysteria.network/zh/docs/getting-started/Installation/"
 ACTION=""
+
+# ======================== 🌐 全局变量 ========================
+remote_version=""
+local_version=""
 # ==================== 颜色定义 ====================
 BLUE='\033[1;34m'     # 亮蓝 - 信息
 GREEN='\033[1;32m'    # 亮绿 - 成功
@@ -81,6 +85,76 @@ show_header() {
     echo -e "${YELLOW}Alpine Linux Hysteria2 安装脚本${NC}"
     echo "                                           "
 }
+# ==================== 🐞 调试工具 ====================
+# 调试暂停函数
+# 用法: debug_pause "提示信息:函数运行完成，按回车继续..."
+debug_pause() {
+    local message="$1"
+    local last_return_code=$?  # 获取上一个命令的返回码
+    
+    echo -e "${PURPLE}🐞 [调试] $message${NC}"
+    echo -e "${PURPLE}🐞 [调试] 上一个命令返回码: $last_return_code${NC}"
+    echo -e "${PURPLE}🐞 [调试] 按回车继续...${NC}"
+    read -r
+    
+    return $last_return_code  # 保持返回码不变
+}
+
+# 调试变量显示函数  
+# 用法: debug_var "变量名" "$变量值"
+debug_var() {
+    local var_name="$1"
+    local var_value="$2"
+    echo -e "${PURPLE}🐞 [调试] $var_name = '$var_value'${NC}"
+}
+
+# 调试步骤开始标记
+# 用法: debug_start "函数名或步骤描述"
+debug_start() {
+    local step_name="$1"
+    echo -e "${PURPLE}🐞 [开始] $step_name${NC}"
+}
+
+# 调试步骤结束标记
+# 用法: debug_end "函数名或步骤描述" $返回值
+debug_end() {
+    local step_name="$1"
+    local return_code="$2"
+    if [ "$return_code" -eq 0 ]; then
+        echo -e "${PURPLE}🐞 [完成] $step_name ✓ (成功)${NC}"
+    else
+        echo -e "${PURPLE}🐞 [完成] $step_name ✗ (失败: $return_code)${NC}"
+    fi
+}
+
+
+#  ======================= 🛠️ 功能函数 ========================
+
+# 通用用户选择函数
+# 参数: $1 - 提示信息
+# 返回: 0 - 用户选择继续(y), 1 - 用户选择退出(n)
+user_choice() {
+    local prompt="$1"
+    while true; do
+        echo -e "${YELLOW}[选择] $prompt${NC}"
+        echo -e "${BLUE}请选择: [y] 继续  [n] 退出${NC}"
+        read -r choice
+        case "$choice" in
+            [yY]|[yY][eE][sS])
+                success "安装将继续......"
+                return 0
+                ;;
+            [nN]|[nN][oO])
+                echo -e "${GREEN}用户选择退出脚本${NC}"
+                exit 0
+                ;;
+            *)
+                warning "无效输入，请输入 y 或 n"
+                ;;
+        esac
+    done
+}
+
 # ======================== 🔧 工具函数 ========================
 # 1.检查IPv4支持
 check_ipv4() {
@@ -90,29 +164,16 @@ check_ipv4() {
         return 0
     else
         error "您的网络需要IPv4支持"
-        warning "如果您使用的是LXC容器-IPv6-only-无NAT64网关，建议先安装WARP"
-        echo
-        while true; do
-            read -p "$(echo -e "${YELLOW}是否继续安装？(y=继续/n=返回菜单): ${NC}")" choice
-            case "$choice" in
-                [yY]*) 
-                    warning "您选择了继续安装，网络功能可能受限"
-                    return 0  # 继续执行
-                    ;;
-                [nN]*) 
-                    info "返回主菜单..."
-                    return 1  # 返回菜单
-                    ;;
-                *) 
-                    error "无效输入，请输入 y 或 n"
-                    ;;
-            esac
-        done
+        warning "如果您使用的是 LXC 容器 IPv6-only 无 NAT64 网关，建议先安装 WARP"
+        user_choice "检测到网络环境不支持IPv4，是否继续安装？"
+        # 如果用户选择继续，user_choice 会返回 0，函数继续执行
+        # 如果用户选择退出，user_choice 会执行 exit 0，脚本直接退出
+        return 0
     fi
 }
 
-# 2.版本控制
-# ======================== 🔄 版本检查与更新 ========================
+# ======================== 🔄 版本控制 ========================
+# ======================== 🔄 版本获取 ========================
 # 2.1.获取远程版本（完美处理 app/v 前缀）
 get_remote_version() {
     local version
@@ -120,30 +181,32 @@ get_remote_version() {
     local retry_delay=1
     
     # 尝试API方式 (带重试机制)
-    for ((i=1; i<=$max_retries; i++)); do
+    i=1
+    while [ $i -le $max_retries ]; do
         version=$(_fetch_via_api)
         if [ $? -eq 0 ] && [ -n "$version" ]; then
             echo "$version"
             return 0
         else
-            # warning "[尝试 $i/$max_retries] API获取失败，等待 ${retry_delay}秒后重试..."
+            warning "[尝试 $i/$max_retries] API获取失败，等待 ${retry_delay}秒后重试..." >&2
             sleep $retry_delay
         fi
+        i=$((i + 1))
     done
     
     # 降级到非API方式
-    # warning "正在使用备用方式获取版本..."
+    warning "正在使用备用方式获取版本..." >&2
     version=$(_fetch_via_web)
     
     if [ -n "$version" ]; then
         echo "$version"
     else
-        echo "版本获取失败"
+        error "not_installed"
         return 1
     fi
 }
 
-# 2.1.1.API方式获取远程版本   
+# # 2.1.1.API方式获取远程版本   
 _fetch_via_api() {
     curl --connect-timeout 5 -fsSL \
         https://api.github.com/repos/apernet/hysteria/releases/latest 2>/dev/null |
@@ -152,7 +215,7 @@ _fetch_via_api() {
         sed 's|^app/v||;s|^v||'
 }
 
-# 2.1.2.非API方式获取远程版本
+# # 2.1.2.非API方式获取远程版本
 _fetch_via_web() {
     curl -fsSL -I \
         https://github.com/apernet/hysteria/releases/latest 2>/dev/null |
@@ -161,7 +224,7 @@ _fetch_via_web() {
         sed 's|^app/v||;s|^v||'
 }
 
-# 2.2.获取本地版本（超强兼容）
+# # 2.2.获取本地版本（超强兼容）
 get_local_version() {
     if [ -x "/usr/local/bin/hysteria" ]; then
         /usr/local/bin/hysteria version 2>/dev/null |
@@ -172,66 +235,83 @@ get_local_version() {
     fi
 }
 
-# ======================== 🔄 版本控制 ========================
+# ======================== 🔄 版本检查与更新 ========================
 check_and_update_version() {
-    # 获取远程版本（带严格错误检查）
-    local remote
-    remote=$(get_remote_version 2>/dev/null)
-    local ret=$?
+    # 使用全局变量获取版本号
+    local remote="$remote_version"
+    local local="$local_version"
     
-    if [ $ret -ne 0 ] || [ -z "$remote" ]; then
-        error "无法获取远程版本号 (错误码: $ret)"
-        error "请检查网络连接或GitHub访问状态"
-        exit 1
+    # 判断版本号是否为有效值（包含数字和点）
+    is_valid_version() {
+        local version="$1"
+        # 检查是否为空或包含非数字和点的字符
+        if [ -z "$version" ] || [ "$version" = "获取失败" ] || [ "$version" = "未安装" ] || [ "$version" = "get_failed" ] || [ "$version" = "not_installed" ]; then
+            return 1  # 无效
+        fi
+        # 检查是否包含数字和点
+        if echo "$version" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            return 0  # 有效
+        else
+            return 1  # 无效
+        fi
+    }
+    
+    # 判断版本有效性
+    local remote_valid=false
+    local local_valid=false
+    
+    if is_valid_version "$remote"; then
+        remote_valid=true
     fi
-
-    # 获取本地版本
-    local local
-    local=$(get_local_version)
     
-    # 版本比较逻辑
-    case "$local" in
-        "$remote")
+    if is_valid_version "$local"; then
+        local_valid=true
+    fi
+    
+    # 根据版本有效性决定程序走向
+    if [ "$remote_valid" = false ] && [ "$local_valid" = false ]; then
+        # 2.1. remote_version为无效值，local_version为无效值
+        warning "远程和本地版本均无效，使用备用源下载"
+        if ! download_hysteria_backup "latest"; then
+            error "备用源下载失败"
+            return 1
+        fi
+        success "备用源下载完成"
+        return 0
+        
+    elif [ "$remote_valid" = false ] && [ "$local_valid" = true ]; then
+        # 2.2. remote_version为无效值，local_version为有效值
+        warning "远程版本获取失败，本地版本正常 (v$local)"
+        info "跳过更新检查"
+        return 0
+        
+    elif [ "$remote_valid" = true ] && [ "$local_valid" = true ]; then
+        # 2.3. remote_version为有效值，local_version为有效值
+        if version_gt "$remote" "$local"; then
+            warning "发现更新 (v$local → v$remote)"
+            if ! download_hysteria "$remote"; then
+                error "更新失败"
+                return 1
+            fi
+            success "更新完成 (v$remote)"
+        else
             success "已是最新版 (v$local)"
-            exit 0
-            ;;
-        "not_installed")
-            info "开始全新安装 v$remote"
-            if ! download_hysteria "$remote"; then
-                error "安装失败"
-                exit 1
-            fi
-            ;;
-        "get_failed")
-            warning "尝试修复安装 (当前版本获取失败)"
-            if ! download_hysteria "$remote"; then
-                error "修复安装失败"
-                exit 1
-            fi
-            ;;
-        *)
-            if version_gt "$remote" "$local"; then
-                warning "发现更新 (v$local → v$remote)"
-                read -p "是否更新? [Y/n] " choice
-                case "${choice:-Y}" in
-                    [Yy]*) 
-                        if ! download_hysteria "$remote"; then
-                            error "更新失败"
-                            exit 1
-                        fi
-                        ;;
-                    *)
-                        info "已取消更新"
-                        exit 0
-                        ;;
-                esac
-            else
-                warning "本地版本 (v$local) 比远程版本 (v$remote) 更新"
-                warning "可能是开发版或自定义构建，跳过更新"
-                exit 0
-            fi
-            ;;
-    esac
+        fi
+        return 0
+        
+    elif [ "$remote_valid" = true ] && [ "$local_valid" = false ]; then
+        # 2.4. remote_version为有效值，local_version为无效值
+        info "开始全新安装 v$remote"
+        if ! download_hysteria "$remote"; then
+            error "安装失败"
+            return 1
+        fi
+        success "安装完成 (v$remote)"
+        return 0
+    fi
+    
+    # 如果所有条件都不匹配，返回成功
+    return 1
 }
 
 # 版本比较函数
@@ -239,7 +319,7 @@ version_gt() {
     test "$(printf '%s\n' "$@" | sort -V | head -n 1)" != "$1"
 }
 
-# ======================== ⬇️ 分层下载实现 ========================
+# # ======================== ⬇️ 分层下载实现 ========================
 
 download_hysteria() {
     # 函数: download_hysteria
@@ -290,6 +370,35 @@ _download_and_install() {
     return 0
 }
 
+# 备用下载函数
+download_hysteria_backup() {
+    # 函数: download_hysteria_backup
+    # 用途: 备用下载器，使用GitHub原始文件
+    # 参数:
+    #   $1: 版本号 (如 2.6.2) - 用于显示信息
+    local version=$1
+    local arch
+    
+    case $(uname -m) in
+        x86_64) arch="amd64" ;;
+        aarch64) arch="arm64" ;;
+        *) error "不支持的架构"; return 1 ;;
+    esac
+
+    local tmp_file=$(mktemp)
+    trap "rm -f '$tmp_file'" EXIT
+
+    info "正在使用备用源下载 v$version [$arch]..."
+    if _download_and_install \
+       "https://raw.githubusercontent.com/dgz1234/hysteria2/refs/heads/main/hysteria-linux-$arch" \
+       "$tmp_file"; then
+        success "备用源下载成功"
+    else
+        error "备用源下载失败 (错误码: $?)"
+        return 1
+    fi
+}
+
 # 3.安装依赖
 install_dependencies() {
     info "正在检测相关依赖..."
@@ -306,21 +415,50 @@ install_dependencies() {
     return 0
 }
 
+# 4.创建专用用户函数
+create_hysteria_user() {
+    if ! id "hysteria" >/dev/null 2>&1; then
+        info "正在创建专用用户 hysteria..."
+        adduser -D -H -s /sbin/nologin hysteria || {
+            error "创建用户失败"
+            return 1
+        }
+        success "专用用户 hysteria 创建成功"
+    else
+        info "专用用户 hysteria 已存在"
+    fi
+}
 
 # 4.生成自签名证书
 generate_self_signed_cert() {
-    info "正在生成自签名证书..."
-    openssl ecparam -genkey -name prime256v1 -out /etc/hysteria/server.key
-    openssl req -new -x509 -days 36500 -key /etc/hysteria/server.key -out /etc/hysteria/server.crt -subj "/CN=www.bing.com"
-    chown hysteria:hysteria /etc/hysteria/server.key /etc/hysteria/server.crt
-    chmod 600 /etc/hysteria/server.key
-    success "自签名证书已生成"
+    # 创建配置目录
+    mkdir -p /etc/hysteria
+    
+    # 检查证书是否已存在
+    if [ ! -f "/etc/hysteria/server.key" ] || [ ! -f "/etc/hysteria/server.crt" ]; then
+        info "正在生成自签名证书..."
+        openssl ecparam -genkey -name prime256v1 -out /etc/hysteria/server.key
+        openssl req -new -x509 -days 36500 -key /etc/hysteria/server.key -out /etc/hysteria/server.crt -subj "/CN=www.bing.com"
+        chown hysteria:hysteria /etc/hysteria/server.key /etc/hysteria/server.crt
+        chmod 600 /etc/hysteria/server.key
+        success "自签名证书已生成"
+    else
+        info "检测到现有TLS证书，跳过生成"
+    fi
 }
 
 # 5.生成配置文件
 generate_config_file() {
     local port=$1
     local password=$2
+    
+    # 检查配置文件是否已存在
+    if [ ! -f "/etc/hysteria/config.yaml" ]; then
+        info "正在生成配置文件..."
+    else
+        info "检测到现有配置文件，跳过生成"
+        return 0
+    fi
     
     # 获取上行带宽设置
     echo -e "${YELLOW}┌────────────────────────────────────────────────────────────┐"
@@ -352,7 +490,7 @@ generate_config_file() {
             case $confirm in
                 [yY]*) 
                     info "正在生成配置文件..."
-                    cat > /etc/hysteria/config.yaml <<EOF
+                    cat > /etc/hysteria/config.yaml <<'EOF'
 listen: :${port}
 tls:
   cert: /etc/hysteria/server.crt
@@ -393,14 +531,15 @@ EOF
 # 6.配置系统服务
 configure_system_service() {
     info "正在配置系统服务..."
-    cat > /etc/init.d/hysteria <<EOF
+    cat > /etc/init.d/hysteria <<'EOF'
 #!/sbin/openrc-run
 name="hysteria"
-command="/usr/local/bin/hysteria"
-command_args="server --config /etc/hysteria/config.yaml"
-command_user="hysteria"
+command="/usr/local/bin/$name"
+command_args="server --config /etc/$name/config.yaml"
+command_user="$name"
 pidfile="/var/run/\${name}.pid"
-command_background="yes"
+logfile="/var/log/${name}.log"
+command_background=true
 
 depend() {
     need net
@@ -408,11 +547,11 @@ depend() {
 }
 EOF
     chmod +x /etc/init.d/hysteria
-    rc-update add hysteria >/dev/null 2>&1
-    /etc/init.d/hysteria start >/dev/null || {
-        error "服务启动失败"
-        return 1
-    }
+    rc-update add hysteria default
+    if ! service hysteria start; then
+    error "服务启动失败"
+    return 1
+    fi
     success "系统服务已配置"
 }
 
@@ -420,10 +559,12 @@ EOF
 install_hysteria() {
     # 1.检查IPv4支持
     check_ipv4 || return 1
-    # 2.版本控制
+    # 2.版本检查与更新
     check_and_update_version || return 1
-    # 3.安装依赖
+    # # 3.安装依赖
     install_dependencies || return 1
+    # 4.创建专用用户函数
+    create_hysteria_user || return 1
 
     read -p "请输入监听端口 (默认: 36711): " port
     port=${port:-36711}
@@ -432,39 +573,20 @@ install_hysteria() {
         password=$(tr -dc 'A-Za-z0-9,_-' < /dev/urandom | head -c 24)
         info "已生成随机密码: ${password}"
     fi
+    debug_var "port" "$port"
+    debug_var "password" "$password"
 
-    if ! id "hysteria" >/dev/null 2>&1; then
-        info "正在创建专用用户 hysteria..."
-        adduser -D -H -s /sbin/nologin hysteria || {
-            error "创建用户失败"
-            return 1
-        }
-        success "专用用户 hysteria 创建成功"
-    else
-        info "专用用户 hysteria 已存在"
-    fi
-    mkdir -p /etc/hysteria
-    # 生成证书
-    if [ ! -f "/etc/hysteria/server.key" ] || [ ! -f "/etc/hysteria/server.crt" ]; then
-        generate_self_signed_cert
-    else
-        info "检测到现有TLS证书，跳过生成"
-    fi
-
-    # 生成配置文件
-    if [ ! -f "/etc/hysteria/config.yaml" ]; then
-        generate_config_file "$port" "$password"
-    else
-        info "检测到现有配置文件，跳过生成"
-    fi
-
-    # 配置系统服务
+    # 5.生成证书（包含目录创建和证书检查）
+    generate_self_signed_cert
+    # 6.生成配置文件（包含配置文件检查）
+    generate_config_file "$port" "$password"
+    # 7.配置系统服务
     configure_system_service
-
+    # 8.显示安装结果
     show_installation_result "$port" "$password"
 }
 
-# 8.显示安装结果
+# 显示安装结果
 show_installation_result() {
     local port=$1
     local password=$2
@@ -561,6 +683,11 @@ uninstall_hysteria() {
         rm -f /usr/local/bin/hysteria && success "可执行文件已删除" || \
         warning "未找到可执行文件"
 
+    # 日志文件删除
+    [ -f /var/log/hysteria.log ] && \
+        rm -f /var/log/hysteria.log && success "日志文件已删除" || \
+        warning "未找到日志文件"
+
     # 配置目录删除
     if [ -d /etc/hysteria ]; then
         rm -rf /etc/hysteria && success "配置和证书已删除" || \
@@ -587,14 +714,16 @@ main_menu() {
         echo
         echo -e "${BLUE}================ 🔄 版本控制 ================${NC}"
         echo
-        echo "最新版本: $(get_remote_version)"
-        echo "本地版本: $(get_local_version)"
+        echo -e "${GREEN}最新版本: $remote_version${NC}"
+        echo -e "${GREEN}本地版本: $local_version${NC}"
         echo
-        echo -e "${GREEN}================ 🖥️ 用户界面 ================${NC}"
+        echo -e "${BLUE}================ 🖥️ 用户界面 ================${NC}"
         echo
-        echo -e "${BLUE}1. 安装 hysteria2\n2. 卸载 hysteria2\n3. 退出脚本${NC}"
+        echo -e "${PURPLE}1. 安装 hysteria2\n2. 卸载 hysteria2\n3. 退出脚本${NC}"
         echo
-        echo -e "${YELLOW}================ 🚀 脚本入口 ================${NC}"
+        echo -e "${BLUE}================ 🚀 脚本入口 ================${NC}"
+        echo
+        read -p "$(echo -e "${RED}请按任意键继续...${NC}")"
         echo
         read -p "请输入选项 [1-3]: " choice
         case "$choice" in
@@ -606,11 +735,15 @@ main_menu() {
                continue
                ;;
         esac
-        read -p "按回车键返回主菜单..."
     done
 }
 
 # ======================== 🚀 脚本入口 ========================
+# 初始化版本信息
+info "正在获取版本信息..."
+remote_version=$(get_remote_version)
+local_version=$(get_local_version)
+sleep 5
 # 处理参数
 parse_args "$@"
 
