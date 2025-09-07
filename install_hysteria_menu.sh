@@ -163,7 +163,7 @@ check_ipv4() {
         success "网络环境正常 (IPv4支持)"
         return 0
     else
-        error "您的网络需要IPv4支持,如果你选择继续安装，则无法对IPv4-only网络的正常访问"
+        error "您的网络需要IPv4支持"
         warning "如果您使用的是 LXC 容器 IPv6-only 无 NAT64 网关，建议先安装 WARP"
         user_choice "检测到网络环境不支持IPv4，是否继续安装？"
         # 如果用户选择继续，user_choice 会返回 0，函数继续执行
@@ -576,9 +576,8 @@ install_hysteria() {
     
     # 9.刷新版本信息
     info "正在刷新版本信息..."
-    remote_version=$(get_remote_version)
     local_version=$(get_local_version)
-    success "版本信息已刷新"
+    success "本地版本: $local_version"
     
     # 10.用户选择后续操作
     echo
@@ -713,9 +712,8 @@ uninstall_hysteria() {
     
     # 刷新版本信息
     info "正在刷新版本信息..."
-    remote_version=$(get_remote_version)
     local_version=$(get_local_version)
-    success "版本信息已刷新"
+    success "本地版本: $local_version"
     
     # 用户选择后续操作
     echo
@@ -768,7 +766,7 @@ main_menu() {
 info "正在获取版本信息..."
 remote_version=$(get_remote_version)
 local_version=$(get_local_version)
-sleep 5
+sleep 2
 # 处理参数
 parse_args "$@"
 
