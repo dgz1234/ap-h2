@@ -8,8 +8,8 @@
 ```
 bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/main/install-warp.sh)
 ```
-完美支持
-0.42机器类型:Alpine Linux-LXC容器-IPv6-only-无NAT64网关-wireguard内核支持-64MB内存-90M磁盘-客户端root
+完美支持cloudcat-0.42机器类型:
+Alpine Linux-LXC容器-IPv6-only-无NAT64网关-wireguard内核支持-64MB内存-90M磁盘-客户端root
 
 # 🛠️ 脚本提供了两种安装模式
 
