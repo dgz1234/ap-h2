@@ -80,10 +80,10 @@ hysteria2://,xtqvQsD aYVTJTUjP@[2001:41d0:303.........]:36711?sni=www.bing.com&a
 如果你使用ipv6节点信息，请确认客户端支持IPv6连接
 ====================================
 服务管理命令:
-启动: /etc/init.d/hysteria start
-停止: /etc/init.d/hysteria stop
-重启: /etc/init.d/hysteria restart
-状态: /etc/init.d/hysteria status
+启动: service hysteria start
+停止: service hysteria stop
+重启: service hysteria restart
+状态: service hysteria status
 按回车键返回主菜单
 ```
 
