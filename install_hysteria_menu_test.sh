@@ -1,11 +1,11 @@
 #!/bin/ash
-# 脚本名称：hysteria_installer.sh
+# 脚本名称：install_hysteria_menu.sh
 # 描述：Alpine Linux Hysteria2 安装工具
 # 适用机器类型：Alpine Linux-LXC容器-IPv6-only-无NAT64网关-wireguard内核支持-客户端root-64M内存-90M磁盘
 # 作者：dgz1234
 # ======================== 📦 常量定义 ========================
-SCRIPT_NAME="hysteria_installer.sh"
-SCRIPT_VERSION="1.1.0"
+SCRIPT_NAME="install_hysteria_menu.sh"
+SCRIPT_VERSION="2.0"
 DOC_URL="https://v2.hysteria.network/zh/docs/getting-started/Installation/"
 ACTION=""
 
