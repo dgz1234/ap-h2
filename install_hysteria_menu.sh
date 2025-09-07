@@ -449,48 +449,59 @@ generate_self_signed_cert() {
 
 # 5.生成配置文件
 generate_config_file() {
-    local port=$1
-    local password=$2
-    
-    # 检查配置文件是否已存在
-    if [ ! -f "/etc/hysteria/config.yaml" ]; then
-        info "正在生成配置文件..."
-    else
-        info "检测到现有配置文件，跳过生成"
+    local port
+    local password
+
+    # 如果配置文件已存在，则解析现有端口与密码并返回
+    if [ -f "/etc/hysteria/config.yaml" ]; then
+        info "检测到现有配置文件，跳过生成" >&2
+        port=$(awk -F':' '/^listen:/ {gsub(/ /,""); split($2,a,":"); print a[2]}' /etc/hysteria/config.yaml)
+        password=$(awk -F':' '/^  password:/ {gsub(/^ +| +$/,"",$2); print $2}' /etc/hysteria/config.yaml)
+        echo "$port $password"
         return 0
     fi
+
+    # 交互获取端口与密码（局部变量）
+    read -p "请输入监听端口 (默认: 36711): " port
+    port=${port:-36711}
+    read -p "请输入密码 (留空将自动生成): " password
+    if [ -z "$password" ]; then
+        # 使用更兼容的密码生成方法
+        password=$(openssl rand -base64 18 2>/dev/null | tr -d "=+/" | cut -c1-24)
+        if [ -z "$password" ]; then
+            # 备用方法：使用日期和随机数
+            password="hysteria$(date +%s | tail -c 8)$(head -c 8 /dev/urandom 2>/dev/null | base64 | tr -d "=+/" | cut -c1-8)"
+        fi
+        if [ -z "$password" ]; then
+            # 最后备用方法：使用简单的时间戳
+            password="hysteria$(date +%s)"
+        fi
+        info "已生成随机密码: ${password}" >&2
+    else
+        info "使用用户输入的密码" >&2
+    fi
+
+    info "正在生成配置文件..." >&2
     
-    # 获取上行带宽设置
-    echo -e "${YELLOW}┌────────────────────────────────────────────────────────────┐"
-    echo -e "│ ${BLUE}⚠ 带宽参数直接影响Hysteria2的速率和稳定性，请真实输入！${YELLOW}       │"
-    echo -e "├────────────────────────────────────────────────────────────┤"
-    echo -e "│ ${NC}中国移动300兆家庭带宽参考值：上行345mbps，下行46mbps${YELLOW}            │"
-    echo -e "└────────────────────────────────────────────────────────────┘${NC}"
-
-    while true; do
-        echo -e "${YELLOW}┌────────────────────────────────────────────────────────────┐"
-        echo -ne "│ ${BLUE}↳ 请输入上行带宽 ${NC}(${GREEN}默认: 345 mbps${NC}): ${YELLOW}"
-        read -r up_bandwidth
-        up_bandwidth=${up_bandwidth:-"345 mbps"}
-        
-        echo -ne "│ ${BLUE}↳ 请输入下行带宽 ${NC}(${GREEN}默认: 46 mbps${NC}): ${YELLOW}"
-        read -r down_bandwidth
-        down_bandwidth=${down_bandwidth:-"46 mbps"}
-        echo -e "└────────────────────────────────────────────────────────────┘${NC}"
-
-        echo -e "${YELLOW}┌────────────────────────────────────────────────────────────┐"
-        echo -e "│ ${BLUE}✔ 当前设置: 上行 ${GREEN}${up_bandwidth}${BLUE} 下行 ${GREEN}${down_bandwidth}${YELLOW}                    │"
-        echo -e "├────────────────────────────────────────────────────────────┤"
-        echo -e "│ ${BLUE}是否确认配置？${NC}                                            │"
-        echo -e "│ ${GREEN}[Y]${NC}es 确认配置   ${RED}[N]${NC}o 重新输入   ${PURPLE}[C]${NC}ancel 中止安装 │"
-        echo -e "└────────────────────────────────────────────────────────────┘${NC}"
-        
-        while true; do
-            read -p "$(echo -e "${BLUE}↳ 请选择 [Y/N/C]: ${NC}")" confirm
-            case $confirm in
-                [yY]*) 
-                    info "正在生成配置文件..."
-                    cat > /etc/hysteria/config.yaml <<EOF
+    # 获取带宽设置（简化版本）
+    echo >&2
+    echo -e "${YELLOW}⚠ 带宽参数直接影响Hysteria2的速率和稳定性，请真实输入！${NC}" >&2
+    echo -e "${BLUE}中国移动300兆家庭带宽参考值：上行345mbps，下行46mbps${NC}" >&2
+    echo >&2
+    
+    read -p "请输入上行带宽 (默认: 345 mbps): " up_bandwidth
+    up_bandwidth=${up_bandwidth:-"345 mbps"}
+    
+    read -p "请输入下行带宽 (默认: 46 mbps): " down_bandwidth
+    down_bandwidth=${down_bandwidth:-"46 mbps"}
+    
+    echo >&2
+    echo -e "${BLUE}当前设置: 上行 ${GREEN}${up_bandwidth}${BLUE} 下行 ${GREEN}${down_bandwidth}${NC}" >&2
+    echo >&2
+    
+    # 直接生成配置文件，不再需要确认
+    info "正在写入配置文件..." >&2
+    cat > /etc/hysteria/config.yaml <<EOF
 listen: :${port}
 tls:
   cert: /etc/hysteria/server.crt
@@ -509,24 +520,10 @@ masquerade:
 socks5:
   listen: "[::]:1080"
 EOF
-                    chown hysteria:hysteria /etc/hysteria/config.yaml
-                    success "配置文件已生成"
-                    return 0
-                    ;;
-                [nN]*) 
-                    retry "正在重新输入带宽参数..."
-                    break
-                    ;;
-                [cC]*) 
-                    error "用户已取消安装"
-                    exit 1
-                    ;;
-                *) 
-                    echo -e "${RED}无效输入，请重新选择${NC}"
-                    ;;
-            esac
-        done
-    done
+    chown hysteria:hysteria /etc/hysteria/config.yaml
+    success "配置文件已生成" >&2
+    echo "$port $password"
+    return 0
 }
 # 6.配置系统服务
 configure_system_service() {
@@ -567,21 +564,33 @@ install_hysteria() {
     create_hysteria_user || return 1
      # 5.生成证书（包含目录创建和证书检查）
     generate_self_signed_cert
-
-    read -p "请输入监听端口 (默认: 36711): " port
-    port=${port:-36711}
-    read -p "请输入密码 (留空将自动生成): " password
-    if [ -z "$password" ]; then
-        password=$(tr -dc 'A-Za-z0-9,_-' < /dev/urandom | head -c 24)
-        info "已生成随机密码: ${password}"
-    fi
-    # 6.生成配置文件（包含配置文件检查）
-    generate_config_file "$port" "$password"
-    debug_pause "按任意键继续..."
+    # 6.生成配置文件（内部获取端口与密码，返回用于展示）
+    read_port_password=$(generate_config_file)
+    set -- $read_port_password
+    port=$1
+    password=$2
     # 7.配置系统服务
     configure_system_service
     # 8.显示安装结果
     show_installation_result "$port" "$password"
+    
+    # 9.刷新版本信息
+    info "正在刷新版本信息..."
+    remote_version=$(get_remote_version)
+    local_version=$(get_local_version)
+    success "版本信息已刷新"
+    
+    # 10.用户选择后续操作
+    echo
+    echo -e "${GREEN}========================================${NC}"
+    echo -e "${BLUE}安装已完成！${NC}"
+    echo -e "${GREEN}========================================${NC}"
+    echo
+    
+    if user_choice "是否返回主菜单？(y=返回主菜单, n=退出脚本)"; then
+        success "返回主菜单..."
+        main_menu
+    fi
 }
 
 # 显示安装结果
@@ -701,6 +710,24 @@ uninstall_hysteria() {
     fi
 
     success "Hysteria 已卸载"
+    
+    # 刷新版本信息
+    info "正在刷新版本信息..."
+    remote_version=$(get_remote_version)
+    local_version=$(get_local_version)
+    success "版本信息已刷新"
+    
+    # 用户选择后续操作
+    echo
+    echo -e "${GREEN}========================================${NC}"
+    echo -e "${BLUE}卸载已完成！${NC}"
+    echo -e "${GREEN}========================================${NC}"
+    echo
+    
+    if user_choice "是否返回主菜单？(y=返回主菜单, n=退出脚本)"; then
+        success "返回主菜单..."
+        main_menu
+    fi
 }
 
 # ======================== 🖥️ 用户界面 ========================

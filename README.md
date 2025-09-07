@@ -2,9 +2,9 @@
 
 ## 🌟 核心特性
 
-这是Hysteria真正玩法，不是那些装模作样的玩法.......
+这一阵子有点忙，刚好有点空，就更新了一下，在warp无法申请新账户的情况下，可以纯ipv6安装，至少保证看个youtube什么的没问题，而且速度嘎嘎的.......
 
-通过安装
+通过安装warp
 ```
 bash <(curl -fsSL https://raw.githubusercontent.com/dgz1234/ap-h2/main/install-warp.sh)
 ```
